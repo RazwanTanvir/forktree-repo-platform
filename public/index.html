@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BlockchainForkTree Dashboard & Search</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="logo-icon">🌿</div>
+        <div>
+          <h1>BlockchainForkTree</h1>
+          <p class="subtitle">Hierarchical Multi-Chain Indexing, Fork Topology & DFS/BFS Search</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div class="status-indicator">
+          <span class="status-dot pulsing"></span>
+          <span id="global-status">7 Chains Active</span>
+        </div>
+        <button id="btn-reseed" class="btn btn-outline" title="Reset all chains, redeploy contracts, and re-seed sample data">
+          ↺ Reset & Reseed
+        </button>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" data-tab="tree">
+        <span class="tab-icon">🌳</span> Fork Tree Topology
+      </button>
+      <button class="tab-btn" data-tab="nodes">
+        <span class="tab-icon">⚡</span> Nodes Monitor
+      </button>
+      <button class="tab-btn" data-tab="data">
+        <span class="tab-icon">📊</span> Data Explorer
+      </button>
+      <button class="tab-btn" data-tab="search">
+        <span class="tab-icon">🔍</span> Multi-Chain Search (DFS / BFS)
+      </button>
+      <button class="tab-btn" data-tab="create-fork">
+        <span class="tab-icon">➕</span> Spin Up Fork
+      </button>
+    </nav>
+
+    <!-- TAB 1: Tree Topology -->
+    <section id="tab-tree" class="tab-content active">
+      <div class="grid-2-col">
+        <div class="card">
+          <div class="card-header">
+            <h3>Interactive Fork Tree Architecture</h3>
+            <span class="badge badge-primary">Dynamic Graph</span>
+          </div>
+          <div class="card-body">
+            <p class="section-desc">
+              Visualizes the parent-child relationships among the forked blockchains. Root chain <code>11102</code> branches into child chains at specific fork block heights.
+            </p>
+            <div id="tree-canvas-container" class="tree-canvas-container">
+              <!-- Rendered via app.js SVG -->
+              <svg id="tree-svg" width="100%" height="450"></svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>How This Forked System Works</h3>
+            <span class="badge badge-info">Architecture Overview</span>
+          </div>
+          <div class="card-body system-explainer">
+            <div class="explainer-item">
+              <div class="explainer-num">1</div>
+              <div>
+                <h4>Metadata Repository Blockchain (Port 8545)</h4>
+                <p>Hosts the <code>StoreForkEvent</code> contract. It maintains the registry of every fork event and builds an adjacency list mapping parent chains to child branches.</p>
+              </div>
+            </div>
+            <div class="explainer-item">
+              <div class="explainer-num">2</div>
+              <div>
+                <h4>Independent Data Chains (Ports 8546–8551)</h4>
+                <p>Each blockchain is an isolated EVM network running its own <code>BlockData</code> contract. Data points can be added at any block height on any branch.</p>
+              </div>
+            </div>
+            <div class="explainer-item">
+              <div class="explainer-num">3</div>
+              <div>
+                <h4>Fork Provenance & Fork Blocks</h4>
+                <p>When Chain B forks from Chain A at block $H$, Chain B inherits historical data up to block $H$, while creating an independent branch for subsequent transactions.</p>
+              </div>
+            </div>
+            <div class="explainer-item">
+              <div class="explainer-num">4</div>
+              <div>
+                <h4>Cross-Chain DFS Traversal Search</h4>
+                <p>Queries the repository for the fork graph adjacency list, then recursively visits branches in Depth-First Search order, calling smart contract search methods on each target chain.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: Nodes Monitor -->
+    <section id="tab-nodes" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <h3>Blockchain Nodes Live Status</h3>
+          <button id="btn-refresh-nodes" class="btn btn-sm btn-outline">↻ Refresh</button>
+        </div>
+        <div class="card-body">
+          <div id="nodes-grid" class="nodes-grid">
+            <!-- Node cards injected via app.js -->
+            <div class="loading-spinner">Loading nodes...</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: Data Explorer -->
+    <section id="tab-data" class="tab-content">
+      <div class="grid-3-col">
+        <div class="col-main">
+          <div class="card">
+            <div class="card-header">
+              <h3>Chain Data Points Explorer</h3>
+              <div class="filter-group">
+                <label for="chain-filter">Select Chain:</label>
+                <select id="chain-filter" class="form-select">
+                  <option value="all">All Chains</option>
+                  <option value="8546">Port 8546 (Root 11102)</option>
+                  <option value="8547">Port 8547 (Fork Alpha 11103)</option>
+                  <option value="8548">Port 8548 (Fork Beta 11104)</option>
+                  <option value="8549">Port 8549 (Fork Gamma 11105)</option>
+                  <option value="8550">Port 8550 (Fork Delta 11106)</option>
+                  <option value="8551">Port 8551 (Fork Epsilon 11107)</option>
+                </select>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Block #</th>
+                      <th>Network ID</th>
+                      <th>RPC Port</th>
+                      <th>Data Value</th>
+                      <th>Provenance</th>
+                    </tr>
+                  </thead>
+                  <tbody id="data-table-body">
+                    <tr><td colspan="5" class="text-center">Loading chain data...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-side">
+          <div class="card">
+            <div class="card-header">
+              <h3>Add Data Point</h3>
+            </div>
+            <div class="card-body">
+              <form id="form-add-data">
+                <div class="form-group">
+                  <label for="add-target-port">Target Blockchain:</label>
+                  <select id="add-target-port" class="form-select" required>
+                    <option value="8546">Port 8546 (Root 11102)</option>
+                    <option value="8547">Port 8547 (Fork Alpha 11103)</option>
+                    <option value="8548">Port 8548 (Fork Beta 11104)</option>
+                    <option value="8549">Port 8549 (Fork Gamma 11105)</option>
+                    <option value="8550">Port 8550 (Fork Delta 11106)</option>
+                    <option value="8551">Port 8551 (Fork Epsilon 11107)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="add-value">Data Value (Integer):</label>
+                  <input type="number" id="add-value" class="form-input" placeholder="e.g. 99" required />
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Submit Transaction</button>
+                <div id="add-data-status" class="alert-msg"></div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: Multi-Chain Tree Search (DFS / BFS) -->
+    <section id="tab-search" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3>Multi-Chain Tree Search Traversal</h3>
+            <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">
+              Traverse the distributed blockchain fork tree to locate blocks containing target data points.
+            </p>
+          </div>
+          <span class="badge badge-success">On-Chain Multi-Algorithm</span>
+        </div>
+        <div class="card-body">
+          <form id="form-search" class="search-form">
+            <div class="search-input-wrapper">
+              <div class="form-group" style="max-width: 180px;">
+                <label for="search-algorithm">Search Method:</label>
+                <select id="search-algorithm" class="form-select">
+                  <option value="BFS" selected>BFS (Breadth-First)</option>
+                  <option value="DFS">DFS (Depth-First)</option>
+                </select>
+              </div>
+              <div class="form-group" style="max-width: 220px;">
+                <label for="search-root">Start Node (Root):</label>
+                <select id="search-root" class="form-select">
+                  <option value="11102" selected>Root 11102 (Port 8546)</option>
+                  <option value="11103">Alpha 11103 (Port 8547)</option>
+                  <option value="11104">Beta 11104 (Port 8548)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="search-value">Target Data Value (Integer):</label>
+                <input type="number" id="search-value" class="form-input" value="43" placeholder="Enter integer to search..." required />
+              </div>
+              <button type="submit" id="btn-search-submit" class="btn btn-primary search-btn">Run Search</button>
+            </div>
+          </form>
+
+          <!-- Algorithm Explanation Cards -->
+          <div class="algo-info-grid">
+            <div class="algo-info-card">
+              <div class="algo-info-title">
+                <span class="badge badge-info">BFS</span> <strong>Breadth-First Search</strong>
+              </div>
+              <p>Visits nodes level-by-level across the hierarchy (Level 0 Root &rarr; Level 1 Forks &rarr; Level 2 Sub-forks). Ideal for finding values residing closest to the origin or main chain.</p>
+            </div>
+            <div class="algo-info-card">
+              <div class="algo-info-title">
+                <span class="badge badge-purple">DFS</span> <strong>Depth-First Search</strong>
+              </div>
+              <p>Dives deep into child branches before backtracking (Root &rarr; Alpha &rarr; Gamma &rarr; Delta &rarr; Beta &rarr; Epsilon). Follows specific lineage chains to their tip before trying siblings.</p>
+            </div>
+          </div>
+
+          <div id="search-results-area" class="search-results-area">
+            <!-- Injected via app.js -->
+            <div class="empty-state">
+              <div class="empty-icon">🔎</div>
+              <p>Select your preferred algorithm (<strong>BFS</strong> or <strong>DFS</strong>), enter a target value, and click <strong>Run Search</strong> to trace the on-chain route.</p>
+              <div class="search-hints">
+                <span>Try quick searches:</span>
+                <button type="button" class="chip" data-search="43" data-algo="BFS">Value 43 with BFS (Fast Level 1 find)</button>
+                <button type="button" class="chip" data-search="43" data-algo="DFS">Value 43 with DFS (Branch backtrack)</button>
+                <button type="button" class="chip" data-search="24" data-algo="BFS">Value 24 (Root 11102)</button>
+                <button type="button" class="chip" data-search="62" data-algo="DFS">Value 62 (Delta 11106)</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: Spin Up New Forked Blockchain -->
+    <section id="tab-create-fork" class="tab-content">
+      <div class="grid-2-col">
+        <!-- Form Card -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>Spin Up New Forked Blockchain</h3>
+              <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">
+                Fork a new independent blockchain node from the Root chain or any existing branch.
+              </p>
+            </div>
+            <span class="badge badge-success">Dynamic Node Spawner</span>
+          </div>
+          <div class="card-body">
+            <form id="form-create-fork">
+              <div class="form-group">
+                <label for="fork-name">Blockchain Name:</label>
+                <input type="text" id="fork-name" class="form-input" placeholder="e.g. Fork Zeta (from Beta)" required />
+              </div>
+
+              <div class="form-group">
+                <label for="fork-parent-select">Parent Chain to Fork From:</label>
+                <select id="fork-parent-select" class="form-select" required>
+                  <!-- Populated dynamically via /api/chains -->
+                  <option value="11102" selected>Root Blockchain 11102 (Port 8546)</option>
+                </select>
+                <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;">
+                  Only <code>11102</code> is the Root chain. Every other blockchain forks from an existing node in the tree hierarchy.
+                </span>
+              </div>
+
+              <div class="form-group">
+                <label for="fork-block-num">Fork Block Height:</label>
+                <div style="display: flex; gap: 8px;">
+                  <input type="number" id="fork-block-num" class="form-input" min="0" value="0" style="flex: 1;" required />
+                  <button type="button" id="btn-use-latest-block" class="btn btn-outline" style="white-space: nowrap; font-size: 12px;">Use Latest</button>
+                </div>
+                <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;">
+                  The parent chain block number at which the state divergence occurs.
+                </span>
+              </div>
+
+              <div class="form-group">
+                <label for="fork-initial-data">Initial Data Points (Optional, Comma-Separated):</label>
+                <input type="text" id="fork-initial-data" class="form-input" placeholder="e.g. 81, 82, 83" />
+                <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;">
+                  Pre-seed integer data points into the new chain's <code>BlockData</code> contract upon boot.
+                </span>
+              </div>
+
+              <button type="submit" id="btn-submit-fork" class="btn btn-primary btn-block" style="padding: 12px; font-size: 14px; font-weight: 600;">
+                🚀 Start & Spin Up Node
+              </button>
+            </form>
+
+            <div id="fork-create-progress" class="fork-progress-container" style="display: none;">
+              <h4 style="font-size: 13px; color: var(--accent-cyan); margin-bottom: 10px;">Spin-Up Lifecycle:</h4>
+              <ul class="progress-steps-list">
+                <li id="step-port" class="progress-step-item pending">1. Allocate dynamic Port & Chain ID</li>
+                <li id="step-node" class="progress-step-item pending">2. Boot JSON-RPC 2.0 Ethereum node</li>
+                <li id="step-contract" class="progress-step-item pending">3. Deploy BlockData smart contract</li>
+                <li id="step-repo" class="progress-step-item pending">4. Register fork event in StoreForkEvent (Port 8545)</li>
+                <li id="step-data" class="progress-step-item pending">5. Ingest initial data points</li>
+              </ul>
+            </div>
+
+            <div id="fork-create-result" style="display: none; margin-top: 16px;"></div>
+          </div>
+        </div>
+
+        <!-- Explainer Card -->
+        <div class="card">
+          <div class="card-header">
+            <h3>How Fork Spawning Works</h3>
+            <span class="badge badge-info">System Architecture</span>
+          </div>
+          <div class="card-body">
+            <div class="system-explainer">
+              <div class="explainer-item">
+                <div class="explainer-num">1</div>
+                <div>
+                  <h4>Single Root Origin</h4>
+                  <p>Chain <code>11102</code> (Port 8546) is the single immutable root blockchain. All other chains in the system are forked blockchains that inherit parent state up to their designated fork block height.</p>
+                </div>
+              </div>
+              <div class="explainer-item">
+                <div class="explainer-num">2</div>
+                <div>
+                  <h4>Zero-Downtime Dynamic Port Allocation</h4>
+                  <p>The multi-chain engine dynamically assigns an unused port (e.g. <code>8552</code>, <code>8553</code>) and starts a new isolated JSON-RPC server on localhost without restarting the existing nodes.</p>
+                </div>
+              </div>
+              <div class="explainer-item">
+                <div class="explainer-num">3</div>
+                <div>
+                  <h4>Automatic Smart Contract Provisioning</h4>
+                  <p>A fresh <code>BlockData.sol</code> contract is deployed to the new chain. The parent-child fork edge is simultaneously logged in the central <code>StoreForkEvent.sol</code> repository on Port 8545.</p>
+                </div>
+              </div>
+              <div class="explainer-item">
+                <div class="explainer-num">4</div>
+                <div>
+                  <h4>Live Visual & Traversal Integration</h4>
+                  <p>As soon as the node is spun up, the interactive SVG tree topology graph adds the new node, the node monitor tracks its block height, and both BFS/DFS algorithms will traverse it.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

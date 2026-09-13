@@ -1,0 +1,170 @@
+[
+	{
+		"inputs": [
+			{
+				"internalType": "int256",
+				"name": "_networkId",
+				"type": "int256"
+			},
+			{
+				"internalType": "int256",
+				"name": "_portNumber",
+				"type": "int256"
+			},
+			{
+				"internalType": "int256",
+				"name": "_data",
+				"type": "int256"
+			}
+		],
+		"name": "addDataPoint",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "dataPoints",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "blockNumber",
+				"type": "uint256"
+			},
+			{
+				"internalType": "int256",
+				"name": "networkId",
+				"type": "int256"
+			},
+			{
+				"internalType": "int256",
+				"name": "portNumber",
+				"type": "int256"
+			},
+			{
+				"internalType": "int256",
+				"name": "data",
+				"type": "int256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getAllDataPoints",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "uint256",
+						"name": "blockNumber",
+						"type": "uint256"
+					},
+					{
+						"internalType": "int256",
+						"name": "networkId",
+						"type": "int256"
+					},
+					{
+						"internalType": "int256",
+						"name": "portNumber",
+						"type": "int256"
+					},
+					{
+						"internalType": "int256",
+						"name": "data",
+						"type": "int256"
+					}
+				],
+				"internalType": "struct DataStore.DataPoint[]",
+				"name": "",
+				"type": "tuple[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "index",
+				"type": "uint256"
+			}
+		],
+		"name": "getDataPointByIndex",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "uint256",
+						"name": "blockNumber",
+						"type": "uint256"
+					},
+					{
+						"internalType": "int256",
+						"name": "networkId",
+						"type": "int256"
+					},
+					{
+						"internalType": "int256",
+						"name": "portNumber",
+						"type": "int256"
+					},
+					{
+						"internalType": "int256",
+						"name": "data",
+						"type": "int256"
+					}
+				],
+				"internalType": "struct DataStore.DataPoint",
+				"name": "",
+				"type": "tuple"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getLastDataPoint",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "uint256",
+						"name": "blockNumber",
+						"type": "uint256"
+					},
+					{
+						"internalType": "int256",
+						"name": "networkId",
+						"type": "int256"
+					},
+					{
+						"internalType": "int256",
+						"name": "portNumber",
+						"type": "int256"
+					},
+					{
+						"internalType": "int256",
+						"name": "data",
+						"type": "int256"
+					}
+				],
+				"internalType": "struct DataStore.DataPoint",
+				"name": "",
+				"type": "tuple"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
+]

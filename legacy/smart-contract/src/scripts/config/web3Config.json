@@ -1,0 +1,28 @@
+{
+    "providers": [
+        {
+            "web3Provider": "http://localhost:8546",
+            "accountPassword": "1234567890"
+        },
+        {
+            "web3Provider": "http://localhost:8547",
+            "accountPassword": "1234567890"
+        },
+        {
+            "web3Provider": "http://localhost:8548",
+            "accountPassword": "1234567890"
+        },
+        {
+            "web3Provider": "http://localhost:8549",
+            "accountPassword": "1234567890"
+        },
+        {
+            "web3Provider": "http://localhost:8550",
+            "accountPassword": "1234567890"
+        },
+        {
+            "web3Provider": "http://localhost:8551",
+            "accountPassword": "1234567890"
+        }
+    ]
+}

@@ -1,0 +1,205 @@
+[
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_networkId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_portNumber",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_parentNetworkId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_parentPort",
+				"type": "uint256"
+			}
+		],
+		"name": "addFork",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "forkId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "networkId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "portNumber",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "parentNetworkId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "parentPort",
+				"type": "uint256"
+			}
+		],
+		"name": "ForkAdded",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "networkId",
+				"type": "uint256"
+			}
+		],
+		"name": "findForkId",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "forks",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "networkId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "portNumber",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "parentNetworkId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "parentPort",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "parentForkId",
+				"type": "uint256"
+			}
+		],
+		"name": "getChildren",
+		"outputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "",
+				"type": "uint256[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "forkId",
+				"type": "uint256"
+			}
+		],
+		"name": "getForkData",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "networkId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "portNumber",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "parentNetworkId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "parentPort",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "isNetworkIdUsed",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "totalForks",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
+]

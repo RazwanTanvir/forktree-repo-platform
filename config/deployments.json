@@ -1,0 +1,74 @@
+{
+  "repository": {
+    "networkId": 11101,
+    "port": 8545,
+    "address": "0x9a7Be947B17511581c3eBD0F8b67deF41D2C5933",
+    "contractType": "StoreForkEvent"
+  },
+  "dataChains": {
+    "11102": {
+      "networkId": 11102,
+      "port": 8546,
+      "name": "Root Blockchain",
+      "address": "0x9a7Be947B17511581c3eBD0F8b67deF41D2C5933",
+      "contractType": "BlockData",
+      "rpcUrl": "http://localhost:8546"
+    },
+    "11103": {
+      "networkId": 11103,
+      "port": 8547,
+      "name": "Fork Alpha (from 11102)",
+      "address": "0x9a7Be947B17511581c3eBD0F8b67deF41D2C5933",
+      "contractType": "BlockData",
+      "rpcUrl": "http://localhost:8547"
+    },
+    "11104": {
+      "networkId": 11104,
+      "port": 8548,
+      "name": "Fork Beta (from 11102)",
+      "address": "0x9a7Be947B17511581c3eBD0F8b67deF41D2C5933",
+      "contractType": "BlockData",
+      "rpcUrl": "http://localhost:8548"
+    },
+    "11105": {
+      "networkId": 11105,
+      "port": 8549,
+      "name": "Fork Gamma (from 11103)",
+      "address": "0x9a7Be947B17511581c3eBD0F8b67deF41D2C5933",
+      "contractType": "BlockData",
+      "rpcUrl": "http://localhost:8549"
+    },
+    "11106": {
+      "networkId": 11106,
+      "port": 8550,
+      "name": "Fork Delta (from 11103)",
+      "address": "0x9a7Be947B17511581c3eBD0F8b67deF41D2C5933",
+      "contractType": "BlockData",
+      "rpcUrl": "http://localhost:8550"
+    },
+    "11107": {
+      "networkId": 11107,
+      "port": 8551,
+      "name": "Fork Epsilon (from 11104)",
+      "address": "0x9a7Be947B17511581c3eBD0F8b67deF41D2C5933",
+      "contractType": "BlockData",
+      "rpcUrl": "http://localhost:8551"
+    },
+    "11108": {
+      "networkId": 11108,
+      "port": 8552,
+      "name": "ERGO-1",
+      "address": "0x4791393149A00cFbd895a6F0506c9238071DB5F8",
+      "contractType": "BlockData",
+      "rpcUrl": "http://localhost:8552"
+    },
+    "11109": {
+      "networkId": 11109,
+      "port": 8553,
+      "name": "MIG-4",
+      "address": "0x271DA3B9B79c697c261275c7cfeE736daAcDa10C",
+      "contractType": "BlockData",
+      "rpcUrl": "http://localhost:8553"
+    }
+  }
+}

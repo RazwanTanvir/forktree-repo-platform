@@ -1,0 +1,9 @@
+{
+    "http://localhost:8546": "./smart-contract/src/scripts/datafiles/dataPoints2.json",
+    "http://localhost:8547": "./smart-contract/src/scripts/datafiles/dataPoints3.json",
+    "http://localhost:8548": "./smart-contract/src/scripts/datafiles/dataPoints4.json",
+    "http://localhost:8549": "./smart-contract/src/scripts/datafiles/dataPoints5.json",
+    "http://localhost:8550": "./smart-contract/src/scripts/datafiles/dataPoints6.json",
+    "http://localhost:8551": "./smart-contract/src/scripts/datafiles/dataPoints7.json"
+  }
+  

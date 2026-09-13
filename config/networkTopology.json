@@ -1,0 +1,73 @@
+{
+  "repositoryChain": {
+    "networkId": 11101,
+    "port": 8545,
+    "name": "Metadata Blockchain (Repository)",
+    "contractType": "StoreForkEvent",
+    "rpcUrl": "http://localhost:8545"
+  },
+  "chains": [
+    {
+      "networkId": 11102,
+      "port": 8546,
+      "name": "Root Blockchain",
+      "parentNetworkId": 11101,
+      "forkBlockNumber": 0,
+      "isRoot": true,
+      "rpcUrl": "http://localhost:8546"
+    },
+    {
+      "networkId": 11103,
+      "port": 8547,
+      "name": "Fork Alpha (from 11102)",
+      "parentNetworkId": 11102,
+      "forkBlockNumber": 1,
+      "isRoot": false,
+      "rpcUrl": "http://localhost:8547"
+    },
+    {
+      "networkId": 11104,
+      "port": 8548,
+      "name": "Fork Beta (from 11102)",
+      "parentNetworkId": 11102,
+      "forkBlockNumber": 3,
+      "isRoot": false,
+      "rpcUrl": "http://localhost:8548"
+    },
+    {
+      "networkId": 11105,
+      "port": 8549,
+      "name": "Fork Gamma (from 11103)",
+      "parentNetworkId": 11103,
+      "forkBlockNumber": 2,
+      "isRoot": false,
+      "rpcUrl": "http://localhost:8549"
+    },
+    {
+      "networkId": 11106,
+      "port": 8550,
+      "name": "Fork Delta (from 11103)",
+      "parentNetworkId": 11103,
+      "forkBlockNumber": 1,
+      "isRoot": false,
+      "rpcUrl": "http://localhost:8550"
+    },
+    {
+      "networkId": 11107,
+      "port": 8551,
+      "name": "Fork Epsilon (from 11104)",
+      "parentNetworkId": 11104,
+      "forkBlockNumber": 3,
+      "isRoot": false,
+      "rpcUrl": "http://localhost:8551"
+    }
+  ],
+  "sampleData": {
+    "11102": [21, 22, 23, 24, 25],
+    "11103": [36, 37, 38, 39, 30],
+    "11104": [41, 42, 43, 44, 45],
+    "11105": [56, 57, 58, 59, 50],
+    "11106": [61, 62, 63, 64, 65],
+    "11107": [76, 77, 78, 79, 70]
+  }
+}

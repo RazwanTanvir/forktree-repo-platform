@@ -1,0 +1,26 @@
+[
+  {
+    "web3Provider": "http://localhost:8546",
+    "contractAddress": "0x0FA333A3bdd5f16eC8e856C3049b358B23E322Ac"
+  },
+  {
+    "web3Provider": "http://localhost:8547",
+    "contractAddress": "0x7b731b8e619aaee8752921cbC5780a9D2B725a7A"
+  },
+  {
+    "web3Provider": "http://localhost:8548",
+    "contractAddress": "0x0A706079DB8fC45Ef957a4f48712Fb5856a24227"
+  },
+  {
+    "web3Provider": "http://localhost:8549",
+    "contractAddress": "0xbcD22598C735eAeA289b6A99CE0cD012a386D0B7"
+  },
+  {
+    "web3Provider": "http://localhost:8550",
+    "contractAddress": "0x51374D53b05b898A441EdBBB403Eb2D40f876eeA"
+  },
+  {
+    "web3Provider": "http://localhost:8551",
+    "contractAddress": "0x2b9c10cea9ae11538F30c2302d76a0b28b7975d2"
+  }
+]

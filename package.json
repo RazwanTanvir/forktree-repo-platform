@@ -1,0 +1,26 @@
+{
+  "name": "forktree-platform",
+  "version": "1.0.0",
+  "description": "Clean, cross-platform BlockchainForkTree multi-chain indexing, DFS search, and visualization dashboard.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node tests/forkTree.test.js",
+    "deploy": "node scripts/deployContracts.js",
+    "seed": "node scripts/seedForkTree.js",
+    "search": "node scripts/searchData.js"
+  },
+  "keywords": [
+    "blockchain",
+    "fork-tree",
+    "ethereum",
+    "dfs",
+    "multi-chain"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ethers": "^6.17.0",
+    "express": "^4.19.2"
+  }
+}

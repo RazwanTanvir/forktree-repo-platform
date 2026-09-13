@@ -1,0 +1,32 @@
+[
+  {
+    "networkId": 11102,
+    "parentNetworkId": 11102,
+    "forkBlockNumber": 2
+  },
+  {
+    "networkId": 11103,
+    "parentNetworkId": 11102,
+    "forkBlockNumber": 1
+  },
+  {
+    "networkId": 11104,
+    "parentNetworkId": 11102,
+    "forkBlockNumber": 3
+  },
+  {
+    "networkId": 11105,
+    "parentNetworkId": 11103,
+    "forkBlockNumber": 2
+  },
+  {
+    "networkId": 11106,
+    "parentNetworkId": 11103,
+    "forkBlockNumber": 1
+  },
+  {
+    "networkId": 11107,
+    "parentNetworkId": 11104,
+    "forkBlockNumber": 3
+  }
+]
