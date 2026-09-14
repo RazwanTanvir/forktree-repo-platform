@@ -1,5 +1,6 @@
 // End-to-end Automated Test Suite for BlockchainForkTree
 const assert = require('assert');
+const crypto = require('crypto');
 const { ethers } = require('ethers');
 const { multiChainEngine } = require('../engine/chainEngine');
 const { deployContracts } = require('../scripts/deployContracts');
@@ -70,8 +71,31 @@ async function runTests() {
       assert.deepStrictEqual(childNetIds, [11103, 11104], 'Root 11102 should have children 11103 and 11104');
     });
 
-    console.log('\n[Suite 4: Cross-Chain Data Ingestion]');
-    await it('Verifies data points stored across all child blockchains', async () => {
+    console.log('\n[Suite 4: Cross-Chain HL7 Healthcare Data Ingestion & Integrity]');
+    await it('Verifies HL7 Patient Health Records stored on child chains', async () => {
+      for (const chain of topology.chains) {
+        const info = deployments.dataChains[chain.networkId];
+        const client = new ContractClient(chain.rpcUrl, BlockData.abi, info.address);
+        const records = await client.call('getAllRecords');
+        const expectedRecs = (topology.samplePatientData[chain.networkId.toString()] || []).length;
+        assert.strictEqual(records.length, expectedRecs, `Expected ${expectedRecs} patient records on port ${chain.port}`);
+      }
+    });
+
+    await it('Verifies SHA-256 cryptographic hash integrity of stored FHIR records', async () => {
+      const rootConfig = topology.chains.find(c => c.port === 8546);
+      const rootClient = new ContractClient(rootConfig.rpcUrl, BlockData.abi, deployments.dataChains[rootConfig.networkId].address);
+      const records = await rootClient.call('getAllRecords');
+      assert.ok(records.length > 0, 'Root should have patient records');
+
+      for (const rec of records) {
+        const computedHash = crypto.createHash('sha256').update(rec.resourceData).digest('hex');
+        assert.strictEqual(rec.dataHash, computedHash, `SHA-256 integrity mismatch for record ${rec.patientId}`);
+        assert.ok(rec.timestamp > 0n, 'Timestamp should be valid Unix epoch seconds');
+      }
+    });
+
+    await it('Verifies legacy integer data points for backward compatibility', async () => {
       for (const chain of topology.chains) {
         const info = deployments.dataChains[chain.networkId];
         const client = new ContractClient(chain.rpcUrl, BlockData.abi, info.address);
@@ -81,44 +105,66 @@ async function runTests() {
       }
     });
 
-    console.log('\n[Suite 5: Depth-First Search (DFS) Traversal]');
-    await it('Discovers target value 43 on Chain 11104 (Port 8548) via DFS', async () => {
-      const searchRes = await forkTreeService.dfsSearch(11102, 43);
+    console.log('\n[Suite 5: Depth-First Search (DFS) & Longitudinal EHR Reconstruction]');
+    await it('Reconstructs complete longitudinal EHR for Patient P101 across all 6 chains via DFS', async () => {
+      const searchRes = await forkTreeService.dfsSearch(11102, 'P101', 'patientId');
       assert.strictEqual(searchRes.algorithm, 'DFS');
-      assert.strictEqual(searchRes.success, true, 'Search should succeed for value 43');
-      assert.strictEqual(searchRes.matches.length, 1, 'Expected 1 match');
-      assert.strictEqual(searchRes.matches[0].networkId, 11104, 'Match should be on Network 11104');
-      assert.strictEqual(searchRes.matches[0].port, 8548, 'Match should be on Port 8548');
-      
+      assert.strictEqual(searchRes.success, true, 'Search should succeed for patient P101');
+      assert.strictEqual(searchRes.matches.length, 6, 'Patient P101 should have records on all 6 chains');
+      assert.ok(searchRes.longitudinalRecord.length >= 6, 'Expected at least 6 aggregated clinical events in EHR');
+
+      // Verify records are sorted chronologically
+      for (let i = 1; i < searchRes.longitudinalRecord.length; i++) {
+        assert.ok(searchRes.longitudinalRecord[i].timestamp >= searchRes.longitudinalRecord[i - 1].timestamp, 'EHR timeline must be sorted chronologically');
+      }
+
+      // Verify DFS exploration order (deep branches first before backtracking)
       const visitedOrder = searchRes.traversalPath.map(p => p.networkId);
-      assert.deepStrictEqual(visitedOrder, [11102, 11103, 11105, 11106, 11104, 11107], 'DFS path should explore branches first');
+      assert.deepStrictEqual(visitedOrder, [11102, 11103, 11105, 11106, 11104, 11107], 'DFS path should explore Alpha branch deep before Beta');
     });
 
-    await it('Discovers target value 62 on Chain 11106 (Port 8550) via DFS', async () => {
-      const searchRes = await forkTreeService.dfsSearch(11102, 62);
-      assert.strictEqual(searchRes.success, true, 'Search should succeed for value 62');
-      assert.strictEqual(searchRes.matches[0].networkId, 11106, 'Match should be on Network 11106');
+    await it('Discovers target integer value 43 on Chain 11104 (Port 8548) via DFS (legacy compat)', async () => {
+      const searchRes = await forkTreeService.dfsSearch(11102, 43);
+      assert.strictEqual(searchRes.success, true);
+      assert.strictEqual(searchRes.matches[0].networkId, 11104);
+      assert.strictEqual(searchRes.matches[0].port, 8548);
     });
 
-    await it('Returns 0 matches for non-existent target value 99999 via DFS', async () => {
-      const searchRes = await forkTreeService.dfsSearch(11102, 99999);
-      assert.strictEqual(searchRes.success, false, 'Search should fail for non-existent value');
-      assert.strictEqual(searchRes.matches.length, 0, 'Matches should be empty');
+    await it('Returns 0 matches for non-existent patient ID P999 via DFS', async () => {
+      const searchRes = await forkTreeService.dfsSearch(11102, 'P999', 'patientId');
+      assert.strictEqual(searchRes.success, false, 'Search should fail for non-existent patient P999');
+      assert.strictEqual(searchRes.matches.length, 0);
     });
 
-    console.log('\n[Suite 6: Breadth-First Search (BFS) Traversal]');
-    await it('Traverses in level-by-level order (Root -> Level 1 -> Level 2)', async () => {
-      const bfsRes = await forkTreeService.bfsSearch(11102, 43);
+    console.log('\n[Suite 6: Breadth-First Search (BFS) & Clinical Resource Filtering]');
+    await it('Reconstructs complete longitudinal EHR for Patient P101 in level-by-level order via BFS', async () => {
+      const bfsRes = await forkTreeService.bfsSearch(11102, 'P101', 'patientId');
       assert.strictEqual(bfsRes.algorithm, 'BFS');
       assert.strictEqual(bfsRes.success, true);
-      assert.strictEqual(bfsRes.matches.length, 1);
-      assert.strictEqual(bfsRes.matches[0].networkId, 11104);
+      assert.strictEqual(bfsRes.matches.length, 6);
+      assert.ok(bfsRes.longitudinalRecord.length >= 6);
 
       const visitedOrder = bfsRes.traversalPath.map(p => p.networkId);
       assert.deepStrictEqual(visitedOrder, [11102, 11103, 11104, 11105, 11106, 11107], 'BFS path must visit siblings (Level 1) before children (Level 2)');
 
       const levels = bfsRes.traversalPath.map(p => p.level);
       assert.deepStrictEqual(levels, [0, 1, 1, 2, 2, 2], 'Node levels should match tree depth');
+    });
+
+    await it('Discovers all Observation resources across chains via BFS', async () => {
+      const obsRes = await forkTreeService.bfsSearch(11102, 'Observation', 'resourceType');
+      assert.strictEqual(obsRes.success, true);
+      // Observations exist on Beta (11104), Gamma (11105), and Delta (11106)
+      const matchedChains = obsRes.matches.map(m => m.networkId).sort();
+      assert.deepStrictEqual(matchedChains, [11104, 11105, 11106], 'Observations should be found on Beta, Gamma, and Delta chains');
+    });
+
+    await it('Discovers clinical diagnosis code E11.9 (Type 2 Diabetes) on Fork Alpha 11103', async () => {
+      const diagRes = await forkTreeService.search('BFS', 11102, 'E11.9', 'keyword');
+      assert.strictEqual(diagRes.success, true);
+      assert.strictEqual(diagRes.matches.length, 1);
+      assert.strictEqual(diagRes.matches[0].networkId, 11103);
+      assert.strictEqual(diagRes.matches[0].matchingRecords[0].clinicalCode, 'ICD-10:E11.9');
     });
 
     await it('Discovers target value 43 at Step 3 in BFS vs Step 5 in DFS', async () => {
@@ -133,18 +179,47 @@ async function runTests() {
       assert.ok(bfsStep < dfsStep, 'BFS should find Level 1 node faster than DFS');
     });
 
-    await it('Unified search API correctly switches between BFS and DFS', async () => {
-      const resBfs = await forkTreeService.search('BFS', 11102, 24);
-      assert.strictEqual(resBfs.algorithm, 'BFS');
-      assert.strictEqual(resBfs.matches[0].networkId, 11102);
+    console.log('\n[Suite 7: Dynamic Healthcare Record Insertion & Integrity Verification]');
+    await it('Dynamically commits new HL7 Observation to Port 8549 and discovers it via BFS and DFS', async () => {
+      const chain5 = topology.chains.find(c => c.port === 8549);
+      const info5 = deployments.dataChains[chain5.networkId];
+      const client5 = new ContractClient(chain5.rpcUrl, BlockData.abi, info5.address);
 
-      const resDfs = await forkTreeService.search('DFS', 11102, 24);
-      assert.strictEqual(resDfs.algorithm, 'DFS');
-      assert.strictEqual(resDfs.matches[0].networkId, 11102);
+      const newFhirData = {
+        resourceType: 'Observation',
+        id: 'OBS-999',
+        status: 'final',
+        code: { coding: [{ system: 'http://loinc.org', code: '2345-7', display: 'Glucose in Blood' }] },
+        subject: { reference: 'Patient/P200' },
+        valueQuantity: { value: 142, unit: 'mg/dL' }
+      };
+      const jsonStr = JSON.stringify(newFhirData);
+      const dataHash = crypto.createHash('sha256').update(jsonStr).digest('hex');
+      const timestamp = Math.floor(Date.now() / 1000);
+
+      await client5.send('addPatientRecord', [
+        chain5.networkId,
+        chain5.port,
+        'P200',
+        'Observation',
+        'LOINC:2345-7',
+        jsonStr,
+        dataHash,
+        timestamp
+      ]);
+
+      // Verify search discovery
+      const bfsRes = await forkTreeService.search('BFS', 11102, 'P200', 'patientId');
+      assert.strictEqual(bfsRes.success, true, 'BFS should discover dynamically added patient P200');
+      assert.strictEqual(bfsRes.matches[0].port, 8549, 'Match should be on Port 8549');
+      assert.strictEqual(bfsRes.matches[0].matchingRecords[0].dataHash, dataHash, 'Hash should match');
+
+      const dfsRes = await forkTreeService.search('DFS', 11102, 'P200', 'patientId');
+      assert.strictEqual(dfsRes.success, true, 'DFS should discover dynamically added patient P200');
+      assert.strictEqual(dfsRes.matches[0].port, 8549);
     });
 
-    console.log('\n[Suite 7: Dynamic Data Point Insertion & Multi-Algorithm Discovery]');
-    await it('Dynamically adds data point 777 to Port 8549 and discovers it via both DFS and BFS', async () => {
+    await it('Dynamically adds legacy integer 777 to Port 8549 and discovers it via DFS', async () => {
       const chain5 = topology.chains.find(c => c.port === 8549);
       const info5 = deployments.dataChains[chain5.networkId];
       const client5 = new ContractClient(chain5.rpcUrl, BlockData.abi, info5.address);
@@ -152,22 +227,31 @@ async function runTests() {
       await client5.send('addDataPoint', [chain5.networkId, chain5.port, 777]);
 
       const dfsRes = await forkTreeService.dfsSearch(11102, 777);
-      assert.strictEqual(dfsRes.success, true, 'DFS should find newly added data point 777');
-      assert.strictEqual(dfsRes.matches[0].port, 8549, 'DFS should match on Port 8549');
-
-      const bfsRes = await forkTreeService.bfsSearch(11102, 777);
-      assert.strictEqual(bfsRes.success, true, 'BFS should find newly added data point 777');
-      assert.strictEqual(bfsRes.matches[0].port, 8549, 'BFS should match on Port 8549');
+      assert.strictEqual(dfsRes.success, true);
+      assert.strictEqual(dfsRes.matches[0].port, 8549);
     });
 
-    console.log('\n[Suite 8: Dynamic Forked Blockchain Creation & Cross-Chain Traversal]');
+    console.log('\n[Suite 8: Dynamic Forked Healthcare Blockchain Spawning & Cross-Chain Traversal]');
     let newForkResult;
-    await it('Dynamically spins up a new forked blockchain "Fork Zeta" from Beta 11104', async () => {
+    await it('Spins up new healthcare fork "Fork Zeta - Oncology Clinic" from Beta 11104', async () => {
       newForkResult = await forkTreeService.createForkChain({
-        name: 'Fork Zeta (Beta Child)',
+        name: 'Fork Zeta - Oncology Clinic',
         parentNetworkId: 11104,
         forkBlockNumber: 4,
-        initialData: [888]
+        initialData: [888],
+        initialPatientRecords: [
+          {
+            patientId: 'P101',
+            resourceType: 'Condition',
+            clinicalCode: 'ICD-10:C34.90',
+            resourceData: {
+              resourceType: 'Condition',
+              id: 'COND-801',
+              code: { coding: [{ system: 'http://hl7.org/fhir/sid/icd-10-cm', code: 'C34.90', display: 'Malignant neoplasm of unsp part of bronchus or lung' }] },
+              subject: { reference: 'Patient/P101' }
+            }
+          }
+        ]
       });
 
       assert.strictEqual(newForkResult.success, true, 'Fork creation should succeed');
@@ -177,15 +261,20 @@ async function runTests() {
       assert.ok(newForkResult.node.contractAddress, 'Expected deployed contract address');
     });
 
-    await it('Verifies new node 8552 JSON-RPC response and contract deployment', async () => {
+    await it('Verifies new node 8552 JSON-RPC response and HL7 patient record deployment', async () => {
       const provider = new ethers.JsonRpcProvider('http://localhost:8552');
       const chainIdHex = await provider.send('eth_chainId', []);
       assert.strictEqual(parseInt(chainIdHex, 16), 11108, 'Chain ID should be 11108');
 
       const client = new ContractClient('http://localhost:8552', BlockData.abi, newForkResult.node.contractAddress);
+      const recs = await client.call('getAllRecords');
+      assert.strictEqual(recs.length, 1, 'Expected 1 seeded initial patient record');
+      assert.strictEqual(recs[0].patientId, 'P101');
+      assert.strictEqual(recs[0].clinicalCode, 'ICD-10:C34.90');
+
       const pts = await client.call('getAllDataPoints');
       assert.strictEqual(pts.length, 1, 'Expected 1 seeded initial data point');
-      assert.strictEqual(Number(pts[0].data), 888, 'Expected value 888');
+      assert.strictEqual(Number(pts[0].data), 888);
     });
 
     await it('Verifies fork registration in Repository on Port 8545 and topology update', async () => {
@@ -205,15 +294,15 @@ async function runTests() {
       assert.strictEqual(edgeExists, true, 'Tree edges should include edge 11104 -> 11108');
     });
 
-    await it('Discovers data point 888 in the new forked blockchain via BFS and DFS search', async () => {
-      const bfsRes = await forkTreeService.search('BFS', 11102, 888);
-      assert.strictEqual(bfsRes.success, true, 'BFS should find 888 in dynamically created fork');
+    await it('Discovers the new oncology record in the spawned fork via BFS and DFS search', async () => {
+      const bfsRes = await forkTreeService.search('BFS', 11102, 'C34.90', 'keyword');
+      assert.strictEqual(bfsRes.success, true, 'BFS should find C34.90 in dynamically created fork');
       assert.strictEqual(bfsRes.matches[0].networkId, 11108, 'Match should be on Network 11108');
       assert.strictEqual(bfsRes.matches[0].port, 8552, 'Match should be on Port 8552');
 
-      const dfsRes = await forkTreeService.search('DFS', 11102, 888);
-      assert.strictEqual(dfsRes.success, true, 'DFS should find 888 in dynamically created fork');
-      assert.strictEqual(dfsRes.matches[0].networkId, 11108, 'Match should be on Network 11108');
+      const dfsRes = await forkTreeService.search('DFS', 11102, 'C34.90', 'keyword');
+      assert.strictEqual(dfsRes.success, true, 'DFS should find C34.90 in dynamically created fork');
+      assert.strictEqual(dfsRes.matches[0].networkId, 11108);
     });
 
     console.log('\n===========================================================');

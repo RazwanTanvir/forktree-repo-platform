@@ -130,17 +130,22 @@
         <div class="col-main">
           <div class="card">
             <div class="card-header">
-              <h3>Chain Data Points Explorer</h3>
+              <div>
+                <h3>HL7 FHIR Healthcare Data Explorer</h3>
+                <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">
+                  Inspect on-chain Patient Health Records secured with SHA-256 integrity hashes across fork tree branches.
+                </p>
+              </div>
               <div class="filter-group">
                 <label for="chain-filter">Select Chain:</label>
                 <select id="chain-filter" class="form-select">
-                  <option value="all">All Chains</option>
-                  <option value="8546">Port 8546 (Root 11102)</option>
-                  <option value="8547">Port 8547 (Fork Alpha 11103)</option>
-                  <option value="8548">Port 8548 (Fork Beta 11104)</option>
-                  <option value="8549">Port 8549 (Fork Gamma 11105)</option>
-                  <option value="8550">Port 8550 (Fork Delta 11106)</option>
-                  <option value="8551">Port 8551 (Fork Epsilon 11107)</option>
+                  <option value="all">All Chains (Cross-Chain Aggregate)</option>
+                  <option value="8546">Port 8546 (Root 11102 - Master Patient Index)</option>
+                  <option value="8547">Port 8547 (Fork Alpha 11103 - Inpatient)</option>
+                  <option value="8548">Port 8548 (Fork Beta 11104 - Labs & Diagnostics)</option>
+                  <option value="8549">Port 8549 (Fork Gamma 11105 - Cardiology)</option>
+                  <option value="8550">Port 8550 (Fork Delta 11106 - Emergency Triage)</option>
+                  <option value="8551">Port 8551 (Fork Epsilon 11107 - Pharmacy)</option>
                 </select>
               </div>
             </div>
@@ -150,14 +155,16 @@
                   <thead>
                     <tr>
                       <th>Block #</th>
-                      <th>Network ID</th>
-                      <th>RPC Port</th>
-                      <th>Data Value</th>
-                      <th>Provenance</th>
+                      <th>Blockchain</th>
+                      <th>Patient ID</th>
+                      <th>HL7 Resource</th>
+                      <th>Clinical Code</th>
+                      <th>SHA-256 Hash</th>
+                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody id="data-table-body">
-                    <tr><td colspan="5" class="text-center">Loading chain data...</td></tr>
+                    <tr><td colspan="7" class="text-center">Loading chain data...</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -168,26 +175,50 @@
         <div class="col-side">
           <div class="card">
             <div class="card-header">
-              <h3>Add Data Point</h3>
+              <h3>Store Patient Record</h3>
             </div>
             <div class="card-body">
               <form id="form-add-data">
                 <div class="form-group">
                   <label for="add-target-port">Target Blockchain:</label>
                   <select id="add-target-port" class="form-select" required>
-                    <option value="8546">Port 8546 (Root 11102)</option>
-                    <option value="8547">Port 8547 (Fork Alpha 11103)</option>
-                    <option value="8548">Port 8548 (Fork Beta 11104)</option>
-                    <option value="8549">Port 8549 (Fork Gamma 11105)</option>
-                    <option value="8550">Port 8550 (Fork Delta 11106)</option>
-                    <option value="8551">Port 8551 (Fork Epsilon 11107)</option>
+                    <option value="8546">Port 8546 (Root 11102 - Demographics)</option>
+                    <option value="8547">Port 8547 (Fork Alpha 11103 - Inpatient)</option>
+                    <option value="8548">Port 8548 (Fork Beta 11104 - Labs)</option>
+                    <option value="8549">Port 8549 (Fork Gamma 11105 - Cardiology)</option>
+                    <option value="8550">Port 8550 (Fork Delta 11106 - Emergency)</option>
+                    <option value="8551">Port 8551 (Fork Epsilon 11107 - Pharmacy)</option>
                   </select>
                 </div>
                 <div class="form-group">
-                  <label for="add-value">Data Value (Integer):</label>
-                  <input type="number" id="add-value" class="form-input" placeholder="e.g. 99" required />
+                  <label for="add-patient-id">Patient ID:</label>
+                  <input type="text" id="add-patient-id" class="form-input" placeholder="e.g. P101 or MRN-104" value="P101" required />
                 </div>
-                <button type="submit" class="btn btn-primary btn-block">Submit Transaction</button>
+                <div class="form-group">
+                  <label for="add-resource-type">HL7 Resource Type:</label>
+                  <select id="add-resource-type" class="form-select" required>
+                    <option value="Observation" selected>Observation (Lab, Vitals)</option>
+                    <option value="Condition">Condition (Diagnosis)</option>
+                    <option value="Encounter">Encounter (Visit)</option>
+                    <option value="DiagnosticReport">DiagnosticReport (EKG, Imaging)</option>
+                    <option value="MedicationRequest">MedicationRequest (Rx)</option>
+                    <option value="Patient">Patient (Demographics)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="add-clinical-code">Clinical Code (LOINC / ICD-10):</label>
+                  <input type="text" id="add-clinical-code" class="form-input" placeholder="e.g. LOINC:15074-8 or ICD-10:E11.9" value="LOINC:15074-8" required />
+                </div>
+                <div class="form-group">
+                  <label for="add-resource-data">FHIR Resource Data (JSON):</label>
+                  <textarea id="add-resource-data" class="form-input" rows="4" style="font-family: var(--font-mono); font-size: 11px;">{
+  "resourceType": "Observation",
+  "status": "final",
+  "code": { "coding": [{ "system": "http://loinc.org", "code": "15074-8", "display": "Glucose" }] },
+  "valueQuantity": { "value": 142, "unit": "mg/dL" }
+}</textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Commit to Blockchain</button>
                 <div id="add-data-status" class="alert-msg"></div>
               </form>
             </div>
@@ -201,24 +232,24 @@
       <div class="card">
         <div class="card-header">
           <div>
-            <h3>Multi-Chain Tree Search Traversal</h3>
+            <h3>Multi-Chain Longitudinal EHR Search Traversal</h3>
             <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">
-              Traverse the distributed blockchain fork tree to locate blocks containing target data points.
+              Traverse distributed healthcare blockchains using BFS or DFS to reconstruct a patient's complete longitudinal record.
             </p>
           </div>
-          <span class="badge badge-success">On-Chain Multi-Algorithm</span>
+          <span class="badge badge-success">On-Chain Healthcare Indexing</span>
         </div>
         <div class="card-body">
           <form id="form-search" class="search-form">
             <div class="search-input-wrapper">
-              <div class="form-group" style="max-width: 180px;">
-                <label for="search-algorithm">Search Method:</label>
+              <div class="form-group" style="max-width: 170px;">
+                <label for="search-algorithm">Traversal Algorithm:</label>
                 <select id="search-algorithm" class="form-select">
                   <option value="BFS" selected>BFS (Breadth-First)</option>
                   <option value="DFS">DFS (Depth-First)</option>
                 </select>
               </div>
-              <div class="form-group" style="max-width: 220px;">
+              <div class="form-group" style="max-width: 200px;">
                 <label for="search-root">Start Node (Root):</label>
                 <select id="search-root" class="form-select">
                   <option value="11102" selected>Root 11102 (Port 8546)</option>
@@ -226,9 +257,19 @@
                   <option value="11104">Beta 11104 (Port 8548)</option>
                 </select>
               </div>
+              <div class="form-group" style="max-width: 170px;">
+                <label for="search-query-type">Query Field:</label>
+                <select id="search-query-type" class="form-select">
+                  <option value="" selected>Auto-Detect</option>
+                  <option value="patientId">Patient ID</option>
+                  <option value="resourceType">HL7 Resource</option>
+                  <option value="keyword">Clinical Code / Keyword</option>
+                  <option value="integer">Legacy Integer</option>
+                </select>
+              </div>
               <div class="form-group">
-                <label for="search-value">Target Data Value (Integer):</label>
-                <input type="number" id="search-value" class="form-input" value="43" placeholder="Enter integer to search..." required />
+                <label for="search-value">Target Query Value:</label>
+                <input type="text" id="search-value" class="form-input" value="P101" placeholder="e.g. P101, Observation, E11.9, 43..." required />
               </div>
               <button type="submit" id="btn-search-submit" class="btn btn-primary search-btn">Run Search</button>
             </div>
@@ -238,29 +279,30 @@
           <div class="algo-info-grid">
             <div class="algo-info-card">
               <div class="algo-info-title">
-                <span class="badge badge-info">BFS</span> <strong>Breadth-First Search</strong>
+                <span class="badge badge-info">BFS</span> <strong>Breadth-First Search (Level-by-Level)</strong>
               </div>
-              <p>Visits nodes level-by-level across the hierarchy (Level 0 Root &rarr; Level 1 Forks &rarr; Level 2 Sub-forks). Ideal for finding values residing closest to the origin or main chain.</p>
+              <p>Traverses the tree level-by-level (Root MPI &rarr; Level 1 Main Specialities &rarr; Level 2 Sub-clinics). Optimal for discovering primary care summaries before drilling into specialized sub-forks.</p>
             </div>
             <div class="algo-info-card">
               <div class="algo-info-title">
-                <span class="badge badge-purple">DFS</span> <strong>Depth-First Search</strong>
+                <span class="badge badge-purple">DFS</span> <strong>Depth-First Search (Lineage Trace)</strong>
               </div>
-              <p>Dives deep into child branches before backtracking (Root &rarr; Alpha &rarr; Gamma &rarr; Delta &rarr; Beta &rarr; Epsilon). Follows specific lineage chains to their tip before trying siblings.</p>
+              <p>Dives deep into a specific clinical department's branch before backtracking (Root &rarr; Inpatient Alpha &rarr; Cardiology Gamma &rarr; Emergency Delta). Ideal for full episode-of-care reconstruction.</p>
             </div>
           </div>
 
           <div id="search-results-area" class="search-results-area">
             <!-- Injected via app.js -->
             <div class="empty-state">
-              <div class="empty-icon">🔎</div>
-              <p>Select your preferred algorithm (<strong>BFS</strong> or <strong>DFS</strong>), enter a target value, and click <strong>Run Search</strong> to trace the on-chain route.</p>
+              <div class="empty-icon">🩺</div>
+              <p>Select your algorithm (<strong>BFS</strong> or <strong>DFS</strong>), enter a target (e.g. Patient <strong>P101</strong>), and click <strong>Run Search</strong> to reconstruct the patient's EHR across the blockchain tree.</p>
               <div class="search-hints">
                 <span>Try quick searches:</span>
-                <button type="button" class="chip" data-search="43" data-algo="BFS">Value 43 with BFS (Fast Level 1 find)</button>
-                <button type="button" class="chip" data-search="43" data-algo="DFS">Value 43 with DFS (Branch backtrack)</button>
-                <button type="button" class="chip" data-search="24" data-algo="BFS">Value 24 (Root 11102)</button>
-                <button type="button" class="chip" data-search="62" data-algo="DFS">Value 62 (Delta 11106)</button>
+                <button type="button" class="chip" data-search="P101" data-algo="BFS" data-type="patientId">Patient P101 with BFS (Level-by-level)</button>
+                <button type="button" class="chip" data-search="P101" data-algo="DFS" data-type="patientId">Patient P101 with DFS (Deep branch)</button>
+                <button type="button" class="chip" data-search="Observation" data-algo="BFS" data-type="resourceType">All Observations (Labs & Vitals)</button>
+                <button type="button" class="chip" data-search="E11.9" data-algo="DFS" data-type="keyword">Condition: Diabetes (E11.9)</button>
+                <button type="button" class="chip" data-search="43" data-algo="BFS" data-type="integer">Integer 43 (Legacy)</button>
               </div>
             </div>
           </div>
@@ -380,6 +422,36 @@
         </div>
       </div>
     </section>
+  </div>
+
+  <!-- HL7 FHIR JSON Inspector Modal -->
+  <div id="fhir-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span id="modal-badge" class="badge-resource badge-resource-observation">Resource</span>
+          <h3 id="modal-title" style="margin: 0; font-size: 16px;">HL7 FHIR Resource Inspector</h3>
+        </div>
+        <button id="modal-close" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-meta-grid">
+          <div><strong style="color: var(--text-secondary);">Patient ID:</strong> <span id="modal-patient-id" style="font-weight: 600;">--</span></div>
+          <div><strong style="color: var(--text-secondary);">Clinical Code:</strong> <span id="modal-clinical-code" style="font-weight: 600;">--</span></div>
+          <div><strong style="color: var(--text-secondary);">Block Height:</strong> <span id="modal-block-num" style="font-weight: 600;">--</span></div>
+          <div><strong style="color: var(--text-secondary);">Origin Chain:</strong> <span id="modal-chain" style="font-weight: 600;">--</span></div>
+          <div style="grid-column: span 2;">
+            <strong style="color: var(--text-secondary);">Cryptographic Hash (SHA-256):</strong>
+            <code id="modal-hash" style="font-size: 11px; word-break: break-all; display: block; margin-top: 2px; color: var(--accent-gold);">--</code>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin: 12px 0 6px 0;">
+          <span style="font-size: 12px; color: var(--text-secondary);">Decoded HL7 FHIR Payload:</span>
+          <button id="modal-copy-btn" class="btn btn-sm btn-outline">📋 Copy JSON</button>
+        </div>
+        <pre id="modal-json-pre" class="code-block"></pre>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>

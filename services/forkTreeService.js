@@ -1,6 +1,7 @@
 // Core service for Fork Tree topology, Node monitoring, and DFS Traversal Search
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { ethers } = require('ethers');
 const { ContractClient } = require('./contractClient');
 const { StoreForkEvent, BlockData } = require('../contracts/compiledArtifacts');
@@ -198,16 +199,82 @@ class ForkTreeService {
     return all;
   }
 
-  async dfsSearch(startNetworkId = 11102, searchValue = 43) {
+  async getChainPatientRecords(port) {
+    const deps = this.getDeployments();
+    const chainConfig = topology.chains.find(c => c.port === Number(port));
+    if (!chainConfig || !deps || !deps.dataChains || !deps.dataChains[chainConfig.networkId]) {
+      return [];
+    }
+
+    const contractInfo = deps.dataChains[chainConfig.networkId];
+    const client = new ContractClient(chainConfig.rpcUrl, BlockData.abi, contractInfo.address);
+
+    const records = await client.call('getAllRecords');
+    return records.map(r => {
+      let parsedData = r.resourceData;
+      try {
+        parsedData = JSON.parse(r.resourceData);
+      } catch (e) {}
+
+      return {
+        blockNumber: Number(r.blockNumber),
+        networkId: Number(r.networkId),
+        portNumber: Number(r.portNumber),
+        patientId: r.patientId,
+        resourceType: r.resourceType,
+        clinicalCode: r.clinicalCode,
+        resourceData: parsedData,
+        rawResourceData: r.resourceData,
+        dataHash: r.dataHash,
+        timestamp: Number(r.timestamp),
+        timestampIso: new Date(Number(r.timestamp) * 1000).toISOString()
+      };
+    });
+  }
+
+  async getAllPatientRecords() {
+    const all = {};
+    for (const chain of topology.chains) {
+      try {
+        all[chain.port] = await this.getChainPatientRecords(chain.port);
+      } catch (err) {
+        all[chain.port] = [];
+      }
+    }
+    return all;
+  }
+
+  _resolveQueryType(searchValue, queryType) {
+    if (queryType && ['patientId', 'resourceType', 'keyword', 'integer'].includes(queryType)) {
+      return queryType;
+    }
+    if (typeof searchValue === 'number') {
+      return 'integer';
+    }
+    const str = String(searchValue).trim();
+    if (/^\d+$/.test(str) && Number(str) < 10000 && !str.startsWith('0')) {
+      return 'integer';
+    }
+    if (/^P\d+$/i.test(str) || str.toUpperCase().startsWith('MRN')) {
+      return 'patientId';
+    }
+    if (['patient', 'observation', 'condition', 'encounter', 'diagnosticreport', 'medicationrequest'].includes(str.toLowerCase())) {
+      return 'resourceType';
+    }
+    return 'keyword';
+  }
+
+  async dfsSearch(startNetworkId = 11102, searchValue = 43, queryType = null) {
     const treeTopology = await this.getTreeTopology();
     const deps = this.getDeployments();
-    const targetVal = BigInt(searchValue);
+    const resolvedType = this._resolveQueryType(searchValue, queryType);
 
     const traversalPath = [];
     const matches = [];
+    const longitudinalRecord = [];
     const visited = new Set();
 
-    async function dfs(currentNetId, depth = 0) {
+    const dfs = async (currentNetId, depth = 0) => {
       if (visited.has(currentNetId)) return;
       visited.add(currentNetId);
 
@@ -234,18 +301,61 @@ class ForkTreeService {
             deps.dataChains[chainConfig.networkId].address
           );
 
-          const matchingBlocks = await client.call('searchMatchingDataPointsBlockNumbers', [targetVal]);
-          const blockNumbers = Array.from(matchingBlocks).map(b => Number(b));
+          let matchingBlocks = [];
+          let matchingRecords = [];
 
-          if (blockNumbers.length > 0) {
+          if (resolvedType === 'integer') {
+            const res = await client.call('searchMatchingDataPointsBlockNumbers', [BigInt(searchValue)]);
+            matchingBlocks = Array.from(res).map(b => Number(b));
+          } else {
+            let res;
+            if (resolvedType === 'patientId') {
+              res = await client.call('searchByPatientId', [String(searchValue)]);
+            } else if (resolvedType === 'resourceType') {
+              res = await client.call('searchByResourceType', [String(searchValue)]);
+            } else {
+              res = await client.call('searchByKeyword', [String(searchValue)]);
+            }
+            matchingBlocks = Array.from(res).map(b => Number(b));
+
+            if (matchingBlocks.length > 0) {
+              const allRecs = await client.call('getAllRecords');
+              for (const r of allRecs) {
+                if (matchingBlocks.includes(Number(r.blockNumber))) {
+                  let parsedData = r.resourceData;
+                  try { parsedData = JSON.parse(r.resourceData); } catch (e) {}
+                  const recObj = {
+                    blockNumber: Number(r.blockNumber),
+                    networkId: Number(r.networkId),
+                    portNumber: Number(r.portNumber),
+                    chainName: chainConfig.name,
+                    patientId: r.patientId,
+                    resourceType: r.resourceType,
+                    clinicalCode: r.clinicalCode,
+                    resourceData: parsedData,
+                    rawResourceData: r.resourceData,
+                    dataHash: r.dataHash,
+                    timestamp: Number(r.timestamp),
+                    timestampIso: new Date(Number(r.timestamp) * 1000).toISOString()
+                  };
+                  matchingRecords.push(recObj);
+                  longitudinalRecord.push(recObj);
+                }
+              }
+            }
+          }
+
+          if (matchingBlocks.length > 0) {
             matches.push({
               networkId: chainConfig.networkId,
               port: chainConfig.port,
               name: chainConfig.name,
               level: depth,
               depth,
-              matchingBlocks: blockNumbers,
-              searchValue: Number(targetVal)
+              matchingBlocks,
+              matchingRecords,
+              searchValue: resolvedType === 'integer' ? Number(searchValue) : String(searchValue),
+              queryType: resolvedType
             });
             pathEntry.foundMatch = true;
           }
@@ -259,30 +369,35 @@ class ForkTreeService {
       for (const childNetId of children) {
         await dfs(childNetId, depth + 1);
       }
-    }
+    };
 
     await dfs(startNetworkId.toString(), 0);
+
+    longitudinalRecord.sort((a, b) => a.timestamp - b.timestamp);
 
     return {
       algorithm: 'DFS',
       query: {
         startNetworkId: Number(startNetworkId),
-        searchValue: Number(searchValue)
+        searchValue: resolvedType === 'integer' ? Number(searchValue) : String(searchValue),
+        queryType: resolvedType
       },
       traversalPath,
       matches,
+      longitudinalRecord,
       visitedCount: visited.size,
       success: matches.length > 0
     };
   }
 
-  async bfsSearch(startNetworkId = 11102, searchValue = 43) {
+  async bfsSearch(startNetworkId = 11102, searchValue = 43, queryType = null) {
     const treeTopology = await this.getTreeTopology();
     const deps = this.getDeployments();
-    const targetVal = BigInt(searchValue);
+    const resolvedType = this._resolveQueryType(searchValue, queryType);
 
     const traversalPath = [];
     const matches = [];
+    const longitudinalRecord = [];
     const visited = new Set();
     const queue = [{ id: startNetworkId.toString(), level: 0 }];
 
@@ -313,17 +428,60 @@ class ForkTreeService {
             deps.dataChains[chainConfig.networkId].address
           );
 
-          const matchingBlocks = await client.call('searchMatchingDataPointsBlockNumbers', [targetVal]);
-          const blockNumbers = Array.from(matchingBlocks).map(b => Number(b));
+          let matchingBlocks = [];
+          let matchingRecords = [];
 
-          if (blockNumbers.length > 0) {
+          if (resolvedType === 'integer') {
+            const res = await client.call('searchMatchingDataPointsBlockNumbers', [BigInt(searchValue)]);
+            matchingBlocks = Array.from(res).map(b => Number(b));
+          } else {
+            let res;
+            if (resolvedType === 'patientId') {
+              res = await client.call('searchByPatientId', [String(searchValue)]);
+            } else if (resolvedType === 'resourceType') {
+              res = await client.call('searchByResourceType', [String(searchValue)]);
+            } else {
+              res = await client.call('searchByKeyword', [String(searchValue)]);
+            }
+            matchingBlocks = Array.from(res).map(b => Number(b));
+
+            if (matchingBlocks.length > 0) {
+              const allRecs = await client.call('getAllRecords');
+              for (const r of allRecs) {
+                if (matchingBlocks.includes(Number(r.blockNumber))) {
+                  let parsedData = r.resourceData;
+                  try { parsedData = JSON.parse(r.resourceData); } catch (e) {}
+                  const recObj = {
+                    blockNumber: Number(r.blockNumber),
+                    networkId: Number(r.networkId),
+                    portNumber: Number(r.portNumber),
+                    chainName: chainConfig.name,
+                    patientId: r.patientId,
+                    resourceType: r.resourceType,
+                    clinicalCode: r.clinicalCode,
+                    resourceData: parsedData,
+                    rawResourceData: r.resourceData,
+                    dataHash: r.dataHash,
+                    timestamp: Number(r.timestamp),
+                    timestampIso: new Date(Number(r.timestamp) * 1000).toISOString()
+                  };
+                  matchingRecords.push(recObj);
+                  longitudinalRecord.push(recObj);
+                }
+              }
+            }
+          }
+
+          if (matchingBlocks.length > 0) {
             matches.push({
               networkId: chainConfig.networkId,
               port: chainConfig.port,
               name: chainConfig.name,
               level,
-              matchingBlocks: blockNumbers,
-              searchValue: Number(targetVal)
+              matchingBlocks,
+              matchingRecords,
+              searchValue: resolvedType === 'integer' ? Number(searchValue) : String(searchValue),
+              queryType: resolvedType
             });
             pathEntry.foundMatch = true;
           }
@@ -341,24 +499,28 @@ class ForkTreeService {
       }
     }
 
+    longitudinalRecord.sort((a, b) => a.timestamp - b.timestamp);
+
     return {
       algorithm: 'BFS',
       query: {
         startNetworkId: Number(startNetworkId),
-        searchValue: Number(searchValue)
+        searchValue: resolvedType === 'integer' ? Number(searchValue) : String(searchValue),
+        queryType: resolvedType
       },
       traversalPath,
       matches,
+      longitudinalRecord,
       visitedCount: visited.size,
       success: matches.length > 0
     };
   }
 
-  async search(algorithm = 'DFS', startNetworkId = 11102, searchValue = 43) {
+  async search(algorithm = 'DFS', startNetworkId = 11102, searchValue = 43, queryType = null) {
     if ((algorithm || '').toUpperCase() === 'BFS') {
-      return this.bfsSearch(startNetworkId, searchValue);
+      return this.bfsSearch(startNetworkId, searchValue, queryType);
     }
-    return this.dfsSearch(startNetworkId, searchValue);
+    return this.dfsSearch(startNetworkId, searchValue, queryType);
   }
 
   async getActiveChains() {
@@ -388,7 +550,7 @@ class ForkTreeService {
     return list;
   }
 
-  async createForkChain({ name, parentNetworkId, forkBlockNumber, initialData = [] }) {
+  async createForkChain({ name, parentNetworkId, forkBlockNumber, initialData = [], initialPatientRecords = [] }) {
     const parentIdNum = Number(parentNetworkId);
     const parentChain = topology.chains.find(c => c.networkId === parentIdNum);
     if (!parentChain) {
@@ -460,7 +622,35 @@ class ForkTreeService {
       }
     }
 
-    // 5. Seed initial data points if provided
+    // 5. Seed initial patient records if provided
+    const insertedRecords = [];
+    if (Array.isArray(initialPatientRecords) && initialPatientRecords.length > 0) {
+      try {
+        const client = new ContractClient(nodeConfig.rpcUrl, BlockData.abi, dataAddress);
+        for (const rec of initialPatientRecords) {
+          const jsonStr = typeof rec.resourceData === 'string' ? rec.resourceData : JSON.stringify(rec.resourceData || {});
+          const dataHash = crypto.createHash('sha256').update(jsonStr).digest('hex');
+          const timestamp = rec.timestamp || Math.floor(Date.now() / 1000);
+
+          await client.send('addPatientRecord', [
+            nodeConfig.networkId,
+            nodeConfig.port,
+            rec.patientId || 'P101',
+            rec.resourceType || 'Observation',
+            rec.clinicalCode || 'CLIN-001',
+            jsonStr,
+            dataHash,
+            timestamp
+          ]);
+          insertedRecords.push(rec);
+        }
+        console.log(`[ForkTreeService] Seeded ${insertedRecords.length} initial HL7 patient records on Port ${nodeConfig.port}`);
+      } catch (err) {
+        console.error(`[ForkTreeService] Failed to seed initial patient records on ${nodeConfig.port}:`, err.message);
+      }
+    }
+
+    // 6. Seed initial legacy data points if provided
     const insertedPoints = [];
     if (Array.isArray(initialData) && initialData.length > 0) {
       try {
@@ -484,7 +674,8 @@ class ForkTreeService {
       node: {
         ...nodeConfig,
         contractAddress: dataAddress,
-        initialData: insertedPoints
+        initialData: insertedPoints,
+        initialPatientRecords: insertedRecords
       }
     };
   }

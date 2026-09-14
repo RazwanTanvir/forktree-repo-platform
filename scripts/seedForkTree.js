@@ -1,6 +1,7 @@
 // Seeds the Fork Tree Topology into Repository Chain and Data Points into Child Chains
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { ContractClient } = require('../services/contractClient');
 const { StoreForkEvent, BlockData } = require('../contracts/compiledArtifacts');
 const topology = require('../config/networkTopology.json');
@@ -35,23 +36,61 @@ async function seedForkTree() {
   const totalForks = await repoClient.call('totalForks');
   console.log(`✓ Fork topology registered! Total forks in repository: ${totalForks}`);
 
-  // 2. Seed Data Points across all data chains (Ports 8546-8551)
-  console.log('\n2. Populating data points across child blockchains...');
+  // 2. Seed Data Points & Patient Health Records across all data chains (Ports 8546-8551)
+  console.log('\n2. Populating HL7 Patient Health Records across child blockchains...');
   const allChainDataDump = {};
+  const allChainPatientDataDump = {};
 
   for (const chain of topology.chains) {
     const chainInfo = deployments.dataChains[chain.networkId];
     const dataClient = new ContractClient(chain.rpcUrl, BlockData.abi, chainInfo.address);
 
-    const values = topology.sampleData[chain.networkId.toString()] || [];
-    console.log(`  -> Chain ${chain.networkId} (Port ${chain.port}): Adding ${values.length} data points [${values.join(', ')}]...`);
+    // 2a. Seed HL7 Patient Records
+    const patientRecords = (topology.samplePatientData && topology.samplePatientData[chain.networkId.toString()]) || [];
+    console.log(`  -> Chain ${chain.networkId} (Port ${chain.port}): Adding ${patientRecords.length} HL7 Patient Records...`);
 
+    for (const rec of patientRecords) {
+      const jsonStr = typeof rec.resourceData === 'string' ? rec.resourceData : JSON.stringify(rec.resourceData);
+      const dataHash = crypto.createHash('sha256').update(jsonStr).digest('hex');
+      const timestamp = Math.floor(Date.now() / 1000);
+
+      await dataClient.send('addPatientRecord', [
+        chain.networkId,
+        chain.port,
+        rec.patientId,
+        rec.resourceType,
+        rec.clinicalCode,
+        jsonStr,
+        dataHash,
+        timestamp
+      ]);
+    }
+
+    const totalRecs = await dataClient.call('totalRecords');
+    console.log(`     ✓ Total HL7 Patient Records on Port ${chain.port}: ${totalRecs}`);
+
+    // 2b. Seed legacy integer data points for backward compatibility
+    const values = topology.sampleData[chain.networkId.toString()] || [];
     for (const val of values) {
       await dataClient.send('addDataPoint', [chain.networkId, chain.port, val]);
     }
 
     const totalPts = await dataClient.call('totalDataPoints');
-    console.log(`     ✓ Total data points on Port ${chain.port}: ${totalPts}`);
+    console.log(`     ✓ Total legacy data points on Port ${chain.port}: ${totalPts}`);
+
+    // Fetch and dump records
+    const records = await dataClient.call('getAllRecords');
+    allChainPatientDataDump[chain.rpcUrl] = records.map(r => ({
+      blockNumber: Number(r.blockNumber),
+      networkId: Number(r.networkId),
+      portNumber: Number(r.portNumber),
+      patientId: r.patientId,
+      resourceType: r.resourceType,
+      clinicalCode: r.clinicalCode,
+      resourceData: r.resourceData,
+      dataHash: r.dataHash,
+      timestamp: Number(r.timestamp)
+    }));
 
     const points = await dataClient.call('getAllDataPoints');
     allChainDataDump[chain.rpcUrl] = points.map(p => [
@@ -78,9 +117,10 @@ async function seedForkTree() {
 
   fs.writeFileSync(path.join(storageDir, 'forkDetail.json'), JSON.stringify(forkDetailsDump, null, 2), 'utf-8');
   fs.writeFileSync(path.join(storageDir, 'chainTreeData.json'), JSON.stringify(allChainDataDump, null, 2), 'utf-8');
+  fs.writeFileSync(path.join(storageDir, 'chainPatientData.json'), JSON.stringify(allChainPatientDataDump, null, 2), 'utf-8');
 
-  console.log(`\n✓ Cached forkDetail.json and chainTreeData.json in ${storageDir}`);
-  return { forkDetails: forkDetailsDump, chainData: allChainDataDump };
+  console.log(`\n✓ Cached forkDetail.json, chainTreeData.json, and chainPatientData.json in ${storageDir}`);
+  return { forkDetails: forkDetailsDump, chainData: allChainDataDump, patientData: allChainPatientDataDump };
 }
 
 if (require.main === module) {

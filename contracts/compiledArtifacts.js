@@ -69,6 +69,99 @@ const StoreForkEventAbi = [
 const BlockDataAbi = [
   {
     "inputs": [
+      { "internalType": "uint256", "name": "_networkId", "type": "uint256" },
+      { "internalType": "uint256", "name": "_portNumber", "type": "uint256" },
+      { "internalType": "string", "name": "_patientId", "type": "string" },
+      { "internalType": "string", "name": "_resourceType", "type": "string" },
+      { "internalType": "string", "name": "_clinicalCode", "type": "string" },
+      { "internalType": "string", "name": "_resourceData", "type": "string" },
+      { "internalType": "string", "name": "_dataHash", "type": "string" },
+      { "internalType": "uint256", "name": "_timestamp", "type": "uint256" }
+    ],
+    "name": "addPatientRecord",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "totalRecords",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "index", "type": "uint256" }],
+    "name": "getRecordByIndex",
+    "outputs": [
+      {
+        "components": [
+          { "internalType": "uint256", "name": "blockNumber", "type": "uint256" },
+          { "internalType": "uint256", "name": "networkId", "type": "uint256" },
+          { "internalType": "uint256", "name": "portNumber", "type": "uint256" },
+          { "internalType": "string", "name": "patientId", "type": "string" },
+          { "internalType": "string", "name": "resourceType", "type": "string" },
+          { "internalType": "string", "name": "clinicalCode", "type": "string" },
+          { "internalType": "string", "name": "resourceData", "type": "string" },
+          { "internalType": "string", "name": "dataHash", "type": "string" },
+          { "internalType": "uint256", "name": "timestamp", "type": "uint256" }
+        ],
+        "internalType": "struct BlockData.PatientHealthRecord",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getAllRecords",
+    "outputs": [
+      {
+        "components": [
+          { "internalType": "uint256", "name": "blockNumber", "type": "uint256" },
+          { "internalType": "uint256", "name": "networkId", "type": "uint256" },
+          { "internalType": "uint256", "name": "portNumber", "type": "uint256" },
+          { "internalType": "string", "name": "patientId", "type": "string" },
+          { "internalType": "string", "name": "resourceType", "type": "string" },
+          { "internalType": "string", "name": "clinicalCode", "type": "string" },
+          { "internalType": "string", "name": "resourceData", "type": "string" },
+          { "internalType": "string", "name": "dataHash", "type": "string" },
+          { "internalType": "uint256", "name": "timestamp", "type": "uint256" }
+        ],
+        "internalType": "struct BlockData.PatientHealthRecord[]",
+        "name": "",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "string", "name": "_patientId", "type": "string" }],
+    "name": "searchByPatientId",
+    "outputs": [{ "internalType": "uint256[]", "name": "", "type": "uint256[]" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "string", "name": "_resourceType", "type": "string" }],
+    "name": "searchByResourceType",
+    "outputs": [{ "internalType": "uint256[]", "name": "", "type": "uint256[]" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "string", "name": "_keyword", "type": "string" }],
+    "name": "searchByKeyword",
+    "outputs": [{ "internalType": "uint256[]", "name": "", "type": "uint256[]" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  // Legacy backward compatibility
+  {
+    "inputs": [
       { "internalType": "int256", "name": "_networkId", "type": "int256" },
       { "internalType": "int256", "name": "_portNumber", "type": "int256" },
       { "internalType": "int256", "name": "_data", "type": "int256" }
@@ -82,44 +175,6 @@ const BlockDataAbi = [
     "inputs": [],
     "name": "totalDataPoints",
     "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{ "internalType": "uint256", "name": "index", "type": "uint256" }],
-    "name": "getDataPointByIndex",
-    "outputs": [
-      {
-        "components": [
-          { "internalType": "uint256", "name": "blockNumber", "type": "uint256" },
-          { "internalType": "int256", "name": "networkId", "type": "int256" },
-          { "internalType": "int256", "name": "portNumber", "type": "int256" },
-          { "internalType": "int256", "name": "data", "type": "int256" }
-        ],
-        "internalType": "struct DataStore.DataPoint",
-        "name": "",
-        "type": "tuple"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "getLastDataPoint",
-    "outputs": [
-      {
-        "components": [
-          { "internalType": "uint256", "name": "blockNumber", "type": "uint256" },
-          { "internalType": "int256", "name": "networkId", "type": "int256" },
-          { "internalType": "int256", "name": "portNumber", "type": "int256" },
-          { "internalType": "int256", "name": "data", "type": "int256" }
-        ],
-        "internalType": "struct DataStore.DataPoint",
-        "name": "",
-        "type": "tuple"
-      }
-    ],
     "stateMutability": "view",
     "type": "function"
   },
@@ -158,6 +213,6 @@ module.exports = {
   },
   BlockData: {
     abi: BlockDataAbi,
-    contractName: "DataStore"
+    contractName: "BlockData"
   }
 };

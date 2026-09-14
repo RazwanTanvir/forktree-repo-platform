@@ -758,3 +758,212 @@ code {
   color: var(--text-primary);
   font-family: var(--font-mono);
 }
+
+/* HL7 FHIR Resource Badges */
+.badge-resource {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge-resource-patient {
+  background: rgba(56, 139, 253, 0.15);
+  color: #58a6ff;
+  border: 1px solid rgba(56, 139, 253, 0.35);
+}
+
+.badge-resource-observation {
+  background: rgba(63, 185, 80, 0.15);
+  color: #3fb950;
+  border: 1px solid rgba(63, 185, 80, 0.35);
+}
+
+.badge-resource-condition {
+  background: rgba(227, 179, 65, 0.15);
+  color: #e3b341;
+  border: 1px solid rgba(227, 179, 65, 0.35);
+}
+
+.badge-resource-encounter {
+  background: rgba(188, 140, 255, 0.15);
+  color: #bc8cff;
+  border: 1px solid rgba(188, 140, 255, 0.35);
+}
+
+.badge-resource-diagnosticreport {
+  background: rgba(57, 197, 207, 0.15);
+  color: #39c5cf;
+  border: 1px solid rgba(57, 197, 207, 0.35);
+}
+
+.badge-resource-medicationrequest {
+  background: rgba(247, 120, 186, 0.15);
+  color: #f778ba;
+  border: 1px solid rgba(247, 120, 186, 0.35);
+}
+
+/* Longitudinal EHR Timeline */
+.ehr-timeline-container {
+  margin-top: 24px;
+}
+
+.ehr-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(56, 139, 253, 0.08);
+  border: 1px solid rgba(56, 139, 253, 0.3);
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+}
+
+.ehr-records-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ehr-record-card {
+  background: #161b22;
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--accent-blue);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.ehr-record-card:hover {
+  transform: translateY(-1px);
+  border-color: #58a6ff;
+}
+
+.ehr-record-card.type-Observation { border-left-color: var(--accent-green); }
+.ehr-record-card.type-Condition { border-left-color: var(--accent-gold); }
+.ehr-record-card.type-Encounter { border-left-color: var(--accent-purple); }
+.ehr-record-card.type-DiagnosticReport { border-left-color: var(--accent-cyan); }
+.ehr-record-card.type-MedicationRequest { border-left-color: #f778ba; }
+
+.ehr-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ehr-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ehr-card-content {
+  font-size: 13px;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+  background: #0d1117;
+  padding: 10px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.ehr-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Modal Dialog */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(3px);
+}
+
+.modal-card {
+  background: #161b22;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  width: 90%;
+  max-width: 720px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  animation: modalIn 0.2s ease-out;
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 24px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.modal-close-btn:hover {
+  color: var(--text-primary);
+}
+
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  font-size: 13px;
+}
+
+.modal-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 12px;
+  background: #0d1117;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  margin-bottom: 14px;
+  font-size: 12px;
+}
+
+.code-block {
+  background: #0d1117;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: #7ee787;
+  overflow-x: auto;
+  max-height: 380px;
+}

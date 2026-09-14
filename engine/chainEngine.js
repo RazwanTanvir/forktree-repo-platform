@@ -65,7 +65,18 @@ class BlockchainNode {
               Array.from(c.state.adjacencyList.entries()).map(([k, v]) => [k, v.map(x => x.toString())])
             )
           } : {
-            dataPoints: c.state.dataPoints.map(dp => dp.map(x => x.toString()))
+            patientRecords: (c.state.patientRecords || []).map(r => [
+              r[0].toString(),
+              r[1].toString(),
+              r[2].toString(),
+              String(r[3]),
+              String(r[4]),
+              String(r[5]),
+              String(r[6]),
+              String(r[7]),
+              r[8].toString()
+            ]),
+            dataPoints: (c.state.dataPoints || []).map(dp => dp.map(x => x.toString()))
           }
         };
       }
@@ -105,6 +116,17 @@ class BlockchainNode {
                 Object.entries(c.state.adjacencyList || {}).map(([k, v]) => [k, v.map(x => BigInt(x))])
               )
             } : {
+              patientRecords: (c.state.patientRecords || []).map(r => [
+                BigInt(r[0]),
+                BigInt(r[1]),
+                BigInt(r[2]),
+                String(r[3]),
+                String(r[4]),
+                String(r[5]),
+                String(r[6]),
+                String(r[7]),
+                BigInt(r[8])
+              ]),
               dataPoints: (c.state.dataPoints || []).map(dp => dp.map(x => BigInt(x)))
             }
           });
@@ -313,7 +335,7 @@ class BlockchainNode {
         type: isRepo ? 'StoreForkEvent' : 'BlockData',
         state: isRepo
           ? { forkDetails: [], adjacencyList: new Map() }
-          : { dataPoints: [] }
+          : { patientRecords: [], dataPoints: [] }
       });
     } else {
       // State-changing contract interaction
@@ -341,15 +363,33 @@ class BlockchainNode {
           }
         } else if (contract.type === 'BlockData') {
           const parsed = this.blockDataIface.parseTransaction({ data: tx.data });
-          if (parsed && parsed.name === 'addDataPoint') {
-            const [networkId, portNumber, data] = parsed.args;
-            const point = [
-              BigInt(this.blockNumber),
-              BigInt(networkId),
-              BigInt(portNumber),
-              BigInt(data)
-            ];
-            contract.state.dataPoints.push(point);
+          if (parsed) {
+            if (parsed.name === 'addPatientRecord') {
+              const [networkId, portNumber, patientId, resourceType, clinicalCode, resourceData, dataHash, timestamp] = parsed.args;
+              const record = [
+                BigInt(this.blockNumber),
+                BigInt(networkId),
+                BigInt(portNumber),
+                String(patientId),
+                String(resourceType),
+                String(clinicalCode),
+                String(resourceData),
+                String(dataHash),
+                BigInt(timestamp || Math.floor(Date.now() / 1000))
+              ];
+              if (!contract.state.patientRecords) contract.state.patientRecords = [];
+              contract.state.patientRecords.push(record);
+            } else if (parsed.name === 'addDataPoint') {
+              const [networkId, portNumber, data] = parsed.args;
+              const point = [
+                BigInt(this.blockNumber),
+                BigInt(networkId),
+                BigInt(portNumber),
+                BigInt(data)
+              ];
+              if (!contract.state.dataPoints) contract.state.dataPoints = [];
+              contract.state.dataPoints.push(point);
+            }
           }
         }
       }
@@ -410,26 +450,71 @@ class BlockchainNode {
       if (!parsed) return '0x';
 
       switch (parsed.name) {
+        case 'totalRecords': {
+          const len = (contract.state.patientRecords || []).length;
+          return this.blockDataIface.encodeFunctionResult('totalRecords', [BigInt(len)]);
+        }
+        case 'getRecordByIndex': {
+          const idx = Number(parsed.args[0]);
+          const item = (contract.state.patientRecords || [])[idx] || [0n, 0n, 0n, '', '', '', '', '', 0n];
+          return this.blockDataIface.encodeFunctionResult('getRecordByIndex', [item]);
+        }
+        case 'getAllRecords': {
+          return this.blockDataIface.encodeFunctionResult('getAllRecords', [contract.state.patientRecords || []]);
+        }
+        case 'searchByPatientId': {
+          const target = String(parsed.args[0]);
+          const matching = [];
+          for (const r of (contract.state.patientRecords || [])) {
+            if (r[3] === target) {
+              matching.push(r[0]);
+            }
+          }
+          return this.blockDataIface.encodeFunctionResult('searchByPatientId', [matching]);
+        }
+        case 'searchByResourceType': {
+          const target = String(parsed.args[0]).toLowerCase();
+          const matching = [];
+          for (const r of (contract.state.patientRecords || [])) {
+            if (r[4].toLowerCase() === target) {
+              matching.push(r[0]);
+            }
+          }
+          return this.blockDataIface.encodeFunctionResult('searchByResourceType', [matching]);
+        }
+        case 'searchByKeyword': {
+          const target = String(parsed.args[0]).toLowerCase();
+          const matching = [];
+          for (const r of (contract.state.patientRecords || [])) {
+            if (r[3].toLowerCase().includes(target) ||
+                r[4].toLowerCase().includes(target) ||
+                r[5].toLowerCase().includes(target) ||
+                r[6].toLowerCase().includes(target)) {
+              matching.push(r[0]);
+            }
+          }
+          return this.blockDataIface.encodeFunctionResult('searchByKeyword', [matching]);
+        }
         case 'totalDataPoints': {
-          return this.blockDataIface.encodeFunctionResult('totalDataPoints', [BigInt(contract.state.dataPoints.length)]);
+          return this.blockDataIface.encodeFunctionResult('totalDataPoints', [BigInt((contract.state.dataPoints || []).length)]);
         }
         case 'getDataPointByIndex': {
           const idx = Number(parsed.args[0]);
-          const item = contract.state.dataPoints[idx] || [0n, 0n, 0n, 0n];
+          const item = (contract.state.dataPoints || [])[idx] || [0n, 0n, 0n, 0n];
           return this.blockDataIface.encodeFunctionResult('getDataPointByIndex', [item]);
         }
         case 'getLastDataPoint': {
-          const len = contract.state.dataPoints.length;
+          const len = (contract.state.dataPoints || []).length;
           const item = len > 0 ? contract.state.dataPoints[len - 1] : [0n, 0n, 0n, 0n];
           return this.blockDataIface.encodeFunctionResult('getLastDataPoint', [item]);
         }
         case 'getAllDataPoints': {
-          return this.blockDataIface.encodeFunctionResult('getAllDataPoints', [contract.state.dataPoints]);
+          return this.blockDataIface.encodeFunctionResult('getAllDataPoints', [contract.state.dataPoints || []]);
         }
         case 'searchMatchingDataPointsBlockNumbers': {
           const targetValue = BigInt(parsed.args[0]);
           const matchingBlocks = [];
-          for (const pt of contract.state.dataPoints) {
+          for (const pt of (contract.state.dataPoints || [])) {
             if (pt[3] === targetValue) {
               matchingBlocks.push(pt[0]);
             }

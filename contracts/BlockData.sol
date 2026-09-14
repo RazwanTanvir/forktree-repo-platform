@@ -1,60 +1,139 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-contract DataStore {
+contract BlockData {
 
-    struct DataPoint {
+    struct PatientHealthRecord {
         uint256 blockNumber;
-        int256 networkId;
-        int256 portNumber;
-        int256 data;
+        uint256 networkId;
+        uint256 portNumber;
+        string patientId;       // e.g. "P101", "MRN-10492"
+        string resourceType;    // HL7 FHIR: "Patient", "Observation", "Condition", "Encounter"
+        string clinicalCode;    // e.g. LOINC "15074-8", ICD-10 "E11.9"
+        string resourceData;    // Complete HL7 FHIR JSON string
+        string dataHash;        // Cryptographic integrity hash (SHA-256)
+        uint256 timestamp;      // Unix epoch seconds
     }
 
-    DataPoint[] public dataPoints;
+    PatientHealthRecord[] public patientRecords;
     uint256 private _currentBlockNumber = 0;
 
-    event DataPointAdded(uint256 indexed blockNumber, int256 indexed networkId, int256 portNumber, int256 data);
+    event PatientRecordAdded(
+        uint256 indexed blockNumber,
+        uint256 indexed networkId,
+        string patientId,
+        string resourceType,
+        string clinicalCode,
+        string dataHash,
+        uint256 timestamp
+    );
 
-    function addDataPoint(int256 _networkId, int256 _portNumber, int256 _data) public {
-        dataPoints.push(DataPoint(_currentBlockNumber, _networkId, _portNumber, _data));
-        emit DataPointAdded(_currentBlockNumber, _networkId, _portNumber, _data);
+    function addPatientRecord(
+        uint256 _networkId,
+        uint256 _portNumber,
+        string memory _patientId,
+        string memory _resourceType,
+        string memory _clinicalCode,
+        string memory _resourceData,
+        string memory _dataHash,
+        uint256 _timestamp
+    ) public {
+        patientRecords.push(PatientHealthRecord(
+            _currentBlockNumber,
+            _networkId,
+            _portNumber,
+            _patientId,
+            _resourceType,
+            _clinicalCode,
+            _resourceData,
+            _dataHash,
+            _timestamp
+        ));
+
+        emit PatientRecordAdded(
+            _currentBlockNumber,
+            _networkId,
+            _patientId,
+            _resourceType,
+            _clinicalCode,
+            _dataHash,
+            _timestamp
+        );
+
         _currentBlockNumber++;
     }
 
-    function totalDataPoints() public view returns (uint256) {
-        return dataPoints.length;
+    function totalRecords() public view returns (uint256) {
+        return patientRecords.length;
     }
 
-    function getDataPointByIndex(uint256 index) public view returns (DataPoint memory) {
-        require(index < dataPoints.length, "Index out of bounds");
-        return dataPoints[index];
+    function getRecordByIndex(uint256 index) public view returns (PatientHealthRecord memory) {
+        require(index < patientRecords.length, "Index out of bounds");
+        return patientRecords[index];
     }
 
-    function getLastDataPoint() public view returns (DataPoint memory) {
-        require(dataPoints.length > 0, "No data points stored yet");
-        return dataPoints[dataPoints.length - 1];
+    function getAllRecords() public view returns (PatientHealthRecord[] memory) {
+        return patientRecords;
     }
 
-    function getAllDataPoints() public view returns (DataPoint[] memory) {
-        return dataPoints;
-    }
-
-    // Search and return block numbers where data matches query
-    function searchMatchingDataPointsBlockNumbers(int256 _data) public view returns (uint256[] memory) {
+    function searchByPatientId(string memory _patientId) public view returns (uint256[] memory) {
+        bytes32 target = keccak256(bytes(_patientId));
         uint256 count = 0;
-        for (uint256 i = 0; i < dataPoints.length; i++) {
-            if (dataPoints[i].data == _data) {
+        for (uint256 i = 0; i < patientRecords.length; i++) {
+            if (keccak256(bytes(patientRecords[i].patientId)) == target) {
                 count++;
             }
         }
-        uint256[] memory matchingBlockNumbers = new uint256[](count);
-        uint256 index = 0;
-        for (uint256 i = 0; i < dataPoints.length; i++) {
-            if (dataPoints[i].data == _data) {
-                matchingBlockNumbers[index] = dataPoints[i].blockNumber;
-                index++;
+        uint256[] memory matchingBlocks = new uint256[](count);
+        uint256 idx = 0;
+        for (uint256 i = 0; i < patientRecords.length; i++) {
+            if (keccak256(bytes(patientRecords[i].patientId)) == target) {
+                matchingBlocks[idx] = patientRecords[i].blockNumber;
+                idx++;
             }
         }
-        return matchingBlockNumbers;
+        return matchingBlocks;
+    }
+
+    function searchByResourceType(string memory _resourceType) public view returns (uint256[] memory) {
+        bytes32 target = keccak256(bytes(_resourceType));
+        uint256 count = 0;
+        for (uint256 i = 0; i < patientRecords.length; i++) {
+            if (keccak256(bytes(patientRecords[i].resourceType)) == target) {
+                count++;
+            }
+        }
+        uint256[] memory matchingBlocks = new uint256[](count);
+        uint256 idx = 0;
+        for (uint256 i = 0; i < patientRecords.length; i++) {
+            if (keccak256(bytes(patientRecords[i].resourceType)) == target) {
+                matchingBlocks[idx] = patientRecords[i].blockNumber;
+                idx++;
+            }
+        }
+        return matchingBlocks;
+    }
+
+    function searchByKeyword(string memory _keyword) public view returns (uint256[] memory) {
+        bytes32 target = keccak256(bytes(_keyword));
+        uint256 count = 0;
+        for (uint256 i = 0; i < patientRecords.length; i++) {
+            if (keccak256(bytes(patientRecords[i].patientId)) == target ||
+                keccak256(bytes(patientRecords[i].resourceType)) == target ||
+                keccak256(bytes(patientRecords[i].clinicalCode)) == target) {
+                count++;
+            }
+        }
+        uint256[] memory matchingBlocks = new uint256[](count);
+        uint256 idx = 0;
+        for (uint256 i = 0; i < patientRecords.length; i++) {
+            if (keccak256(bytes(patientRecords[i].patientId)) == target ||
+                keccak256(bytes(patientRecords[i].resourceType)) == target ||
+                keccak256(bytes(patientRecords[i].clinicalCode)) == target) {
+                matchingBlocks[idx] = patientRecords[i].blockNumber;
+                idx++;
+            }
+        }
+        return matchingBlocks;
     }
 }

@@ -1,6 +1,7 @@
 // Web Dashboard and API Server for BlockchainForkTree
 const express = require('express');
 const path = require('path');
+const crypto = require('crypto');
 const { multiChainEngine } = require('./engine/chainEngine');
 const { deployContracts } = require('./scripts/deployContracts');
 const { seedForkTree } = require('./scripts/seedForkTree');
@@ -35,42 +36,86 @@ app.get('/api/tree', async (req, res) => {
   }
 });
 
-// 3. Get All Chain Data Points
+// 3. Get All Chain Data Points & HL7 Patient Records
 app.get('/api/data', async (req, res) => {
   try {
-    const data = await forkTreeService.getAllDataPoints();
-    res.json({ success: true, data });
+    const patientData = await forkTreeService.getAllPatientRecords();
+    const dataPoints = await forkTreeService.getAllDataPoints();
+    res.json({ success: true, data: patientData, points: dataPoints });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// 4. Get Data Points for specific chain port
+// 4. Get Data for specific chain port
 app.get('/api/data/:port', async (req, res) => {
   try {
     const port = parseInt(req.params.port, 10);
-    const data = await forkTreeService.getChainDataPoints(port);
-    res.json({ success: true, port, data });
+    const patientData = await forkTreeService.getChainPatientRecords(port);
+    const dataPoints = await forkTreeService.getChainDataPoints(port);
+    res.json({ success: true, port, data: patientData, points: dataPoints });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// 5. Run DFS / BFS Tree Search
+// 5. Run DFS / BFS Tree Search (Patient ID, Resource Type, Clinical Code, or Integer)
 app.post('/api/search', async (req, res) => {
   try {
-    const { startNetworkId = 11102, searchValue = 43, algorithm = 'DFS' } = req.body;
-    const result = await forkTreeService.search(algorithm, startNetworkId, searchValue);
+    const { startNetworkId = 11102, searchValue = 'P101', algorithm = 'BFS', queryType = null } = req.body;
+    const result = await forkTreeService.search(algorithm, startNetworkId, searchValue, queryType);
     res.json({ success: true, result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// 6. Add Data Point to a specific chain
+// 6. Add HL7 Patient Health Record
+app.post('/api/add-patient-record', async (req, res) => {
+  try {
+    const { port, patientId, resourceType, clinicalCode, resourceData } = req.body;
+    const chainConfig = topology.chains.find(c => c.port === Number(port));
+    if (!chainConfig) {
+      return res.status(400).json({ success: false, error: `Invalid chain port: ${port}` });
+    }
+
+    const deps = forkTreeService.getDeployments();
+    if (!deps || !deps.dataChains || !deps.dataChains[chainConfig.networkId]) {
+      return res.status(400).json({ success: false, error: 'Contract not deployed on this chain' });
+    }
+
+    const jsonStr = typeof resourceData === 'string' ? resourceData : JSON.stringify(resourceData || {});
+    const dataHash = crypto.createHash('sha256').update(jsonStr).digest('hex');
+    const timestamp = Math.floor(Date.now() / 1000);
+
+    const contractInfo = deps.dataChains[chainConfig.networkId];
+    const client = new ContractClient(chainConfig.rpcUrl, BlockData.abi, contractInfo.address);
+    const tx = await client.send('addPatientRecord', [
+      chainConfig.networkId,
+      chainConfig.port,
+      patientId,
+      resourceType,
+      clinicalCode,
+      jsonStr,
+      dataHash,
+      timestamp
+    ]);
+
+    res.json({
+      success: true,
+      message: `HL7 ${resourceType} record for patient ${patientId} added to Chain ${chainConfig.networkId} (Port ${port})`,
+      txHash: tx.hash,
+      dataHash
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 7. Add Data Point to a specific chain (supports both HL7 and integer formats)
 app.post('/api/add-data', async (req, res) => {
   try {
-    const { port, dataValue } = req.body;
+    const { port, dataValue, patientId, resourceType, clinicalCode, resourceData } = req.body;
     const chainConfig = topology.chains.find(c => c.port === Number(port));
     if (!chainConfig) {
       return res.status(400).json({ success: false, error: `Invalid chain port: ${port}` });
@@ -83,6 +128,31 @@ app.post('/api/add-data', async (req, res) => {
 
     const contractInfo = deps.dataChains[chainConfig.networkId];
     const client = new ContractClient(chainConfig.rpcUrl, BlockData.abi, contractInfo.address);
+
+    if (patientId) {
+      const jsonStr = typeof resourceData === 'string' ? resourceData : JSON.stringify(resourceData || {});
+      const dataHash = crypto.createHash('sha256').update(jsonStr).digest('hex');
+      const timestamp = Math.floor(Date.now() / 1000);
+
+      const tx = await client.send('addPatientRecord', [
+        chainConfig.networkId,
+        chainConfig.port,
+        patientId,
+        resourceType || 'Observation',
+        clinicalCode || 'GEN-001',
+        jsonStr,
+        dataHash,
+        timestamp
+      ]);
+
+      return res.json({
+        success: true,
+        message: `HL7 Patient Record for ${patientId} added to Chain ${chainConfig.networkId} (Port ${port})`,
+        txHash: tx.hash,
+        dataHash
+      });
+    }
+
     const tx = await client.send('addDataPoint', [
       chainConfig.networkId,
       chainConfig.port,
@@ -99,7 +169,7 @@ app.post('/api/add-data', async (req, res) => {
   }
 });
 
-// 7. List Active Chains
+// 8. List Active Chains
 app.get('/api/chains', async (req, res) => {
   try {
     const chains = await forkTreeService.getActiveChains();
@@ -109,10 +179,10 @@ app.get('/api/chains', async (req, res) => {
   }
 });
 
-// 8. Spin Up New Forked Blockchain
+// 9. Spin Up New Forked Blockchain
 app.post('/api/fork/create', async (req, res) => {
   try {
-    const { name, parentNetworkId, forkBlockNumber, initialData } = req.body;
+    const { name, parentNetworkId, forkBlockNumber, initialData, initialPatientRecords } = req.body;
     if (!parentNetworkId) {
       return res.status(400).json({ success: false, error: 'Parent blockchain selection is required.' });
     }
@@ -120,7 +190,8 @@ app.post('/api/fork/create', async (req, res) => {
       name,
       parentNetworkId,
       forkBlockNumber,
-      initialData
+      initialData,
+      initialPatientRecords
     });
     res.json(result);
   } catch (err) {

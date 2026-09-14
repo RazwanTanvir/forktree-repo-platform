@@ -69,5 +69,268 @@
     "11105": [56, 57, 58, 59, 50],
     "11106": [61, 62, 63, 64, 65],
     "11107": [76, 77, 78, 79, 70]
+  },
+  "samplePatientData": {
+    "11102": [
+      {
+        "patientId": "P101",
+        "resourceType": "Patient",
+        "clinicalCode": "US-CORE-PATIENT",
+        "resourceData": {
+          "resourceType": "Patient",
+          "id": "P101",
+          "active": true,
+          "name": [{ "use": "official", "family": "Doe", "given": ["John", "Alexander"] }],
+          "gender": "male",
+          "birthDate": "1980-05-12",
+          "telecom": [{ "system": "phone", "value": "+1-555-0101", "use": "mobile" }],
+          "address": [{ "line": ["124 Main Street"], "city": "Boston", "state": "MA", "postalCode": "02108" }]
+        }
+      },
+      {
+        "patientId": "P102",
+        "resourceType": "Patient",
+        "clinicalCode": "US-CORE-PATIENT",
+        "resourceData": {
+          "resourceType": "Patient",
+          "id": "P102",
+          "active": true,
+          "name": [{ "use": "official", "family": "Smith", "given": ["Jane", "Elizabeth"] }],
+          "gender": "female",
+          "birthDate": "1992-11-03",
+          "telecom": [{ "system": "phone", "value": "+1-555-0102", "use": "mobile" }],
+          "address": [{ "line": ["456 Elm Street"], "city": "Cambridge", "state": "MA", "postalCode": "02138" }]
+        }
+      },
+      {
+        "patientId": "P103",
+        "resourceType": "Patient",
+        "clinicalCode": "US-CORE-PATIENT",
+        "resourceData": {
+          "resourceType": "Patient",
+          "id": "P103",
+          "active": true,
+          "name": [{ "use": "official", "family": "Johnson", "given": ["Robert"] }],
+          "gender": "male",
+          "birthDate": "1965-08-22",
+          "telecom": [{ "system": "phone", "value": "+1-555-0103", "use": "home" }]
+        }
+      }
+    ],
+    "11103": [
+      {
+        "patientId": "P101",
+        "resourceType": "Condition",
+        "clinicalCode": "ICD-10:E11.9",
+        "resourceData": {
+          "resourceType": "Condition",
+          "id": "COND-301",
+          "clinicalStatus": { "coding": [{ "system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active", "display": "Active" }] },
+          "verificationStatus": { "coding": [{ "system": "http://terminology.hl7.org/CodeSystem/condition-ver-status", "code": "confirmed", "display": "Confirmed" }] },
+          "code": { "coding": [{ "system": "http://hl7.org/fhir/sid/icd-10-cm", "code": "E11.9", "display": "Type 2 diabetes mellitus without complications" }] },
+          "subject": { "reference": "Patient/P101" },
+          "onsetDateTime": "2021-03-15"
+        }
+      },
+      {
+        "patientId": "P101",
+        "resourceType": "Encounter",
+        "clinicalCode": "CPT:99214",
+        "resourceData": {
+          "resourceType": "Encounter",
+          "id": "ENC-401",
+          "status": "finished",
+          "class": { "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode", "code": "IMP", "display": "Inpatient Encounter" },
+          "type": [{ "coding": [{ "system": "http://www.ama-assn.org/go/cpt", "code": "99214", "display": "Inpatient visit, moderate medical decision" }] }],
+          "subject": { "reference": "Patient/P101" },
+          "period": { "start": "2024-01-10T09:00:00Z", "end": "2024-01-12T14:00:00Z" }
+        }
+      },
+      {
+        "patientId": "P102",
+        "resourceType": "Condition",
+        "clinicalCode": "ICD-10:J45.909",
+        "resourceData": {
+          "resourceType": "Condition",
+          "id": "COND-302",
+          "clinicalStatus": { "coding": [{ "system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active" }] },
+          "code": { "coding": [{ "system": "http://hl7.org/fhir/sid/icd-10-cm", "code": "J45.909", "display": "Unspecified asthma, uncomplicated" }] },
+          "subject": { "reference": "Patient/P102" },
+          "onsetDateTime": "2022-06-01"
+        }
+      }
+    ],
+    "11104": [
+      {
+        "patientId": "P101",
+        "resourceType": "Observation",
+        "clinicalCode": "LOINC:15074-8",
+        "resourceData": {
+          "resourceType": "Observation",
+          "id": "OBS-201",
+          "status": "final",
+          "category": [{ "coding": [{ "system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "laboratory" }] }],
+          "code": { "coding": [{ "system": "http://loinc.org", "code": "15074-8", "display": "Glucose [Mass/volume] in Blood" }] },
+          "subject": { "reference": "Patient/P101" },
+          "valueQuantity": { "value": 138, "unit": "mg/dL", "system": "http://unitsofmeasure.org", "code": "mg/dL" },
+          "referenceRange": [{ "low": { "value": 70, "unit": "mg/dL" }, "high": { "value": 99, "unit": "mg/dL" } }],
+          "interpretation": [{ "coding": [{ "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation", "code": "H", "display": "High" }] }]
+        }
+      },
+      {
+        "patientId": "P101",
+        "resourceType": "Observation",
+        "clinicalCode": "LOINC:4548-4",
+        "resourceData": {
+          "resourceType": "Observation",
+          "id": "OBS-202",
+          "status": "final",
+          "code": { "coding": [{ "system": "http://loinc.org", "code": "4548-4", "display": "Hemoglobin A1c/Hemoglobin.total in Blood" }] },
+          "subject": { "reference": "Patient/P101" },
+          "valueQuantity": { "value": 7.2, "unit": "%", "system": "http://unitsofmeasure.org", "code": "%" },
+          "interpretation": [{ "coding": [{ "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation", "code": "H", "display": "High" }] }]
+        }
+      },
+      {
+        "patientId": "P103",
+        "resourceType": "Observation",
+        "clinicalCode": "LOINC:2093-3",
+        "resourceData": {
+          "resourceType": "Observation",
+          "id": "OBS-203",
+          "status": "final",
+          "code": { "coding": [{ "system": "http://loinc.org", "code": "2093-3", "display": "Cholesterol [Mass/volume] in Serum" }] },
+          "subject": { "reference": "Patient/P103" },
+          "valueQuantity": { "value": 215, "unit": "mg/dL", "system": "http://unitsofmeasure.org", "code": "mg/dL" }
+        }
+      }
+    ],
+    "11105": [
+      {
+        "patientId": "P101",
+        "resourceType": "Observation",
+        "clinicalCode": "LOINC:8867-4",
+        "resourceData": {
+          "resourceType": "Observation",
+          "id": "OBS-204",
+          "status": "final",
+          "category": [{ "coding": [{ "system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "vital-signs" }] }],
+          "code": { "coding": [{ "system": "http://loinc.org", "code": "8867-4", "display": "Heart rate" }] },
+          "subject": { "reference": "Patient/P101" },
+          "valueQuantity": { "value": 76, "unit": "/min", "system": "http://unitsofmeasure.org", "code": "/min" }
+        }
+      },
+      {
+        "patientId": "P101",
+        "resourceType": "DiagnosticReport",
+        "clinicalCode": "LOINC:11524-6",
+        "resourceData": {
+          "resourceType": "DiagnosticReport",
+          "id": "REP-501",
+          "status": "final",
+          "code": { "coding": [{ "system": "http://loinc.org", "code": "11524-6", "display": "EKG 12 channel report" }] },
+          "subject": { "reference": "Patient/P101" },
+          "conclusion": "Normal sinus rhythm, rate 76 bpm. PR interval 156 ms, QRS 88 ms. No acute ischemic changes."
+        }
+      },
+      {
+        "patientId": "P103",
+        "resourceType": "Condition",
+        "clinicalCode": "ICD-10:I10",
+        "resourceData": {
+          "resourceType": "Condition",
+          "id": "COND-303",
+          "clinicalStatus": { "coding": [{ "system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active" }] },
+          "code": { "coding": [{ "system": "http://hl7.org/fhir/sid/icd-10-cm", "code": "I10", "display": "Essential (primary) hypertension" }] },
+          "subject": { "reference": "Patient/P103" }
+        }
+      }
+    ],
+    "11106": [
+      {
+        "patientId": "P101",
+        "resourceType": "Encounter",
+        "clinicalCode": "CPT:99283",
+        "resourceData": {
+          "resourceType": "Encounter",
+          "id": "ENC-402",
+          "status": "finished",
+          "class": { "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode", "code": "EMER", "display": "Emergency" },
+          "type": [{ "coding": [{ "system": "http://www.ama-assn.org/go/cpt", "code": "99283", "display": "Emergency department visit, moderate severity" }] }],
+          "subject": { "reference": "Patient/P101" },
+          "period": { "start": "2024-02-14T22:15:00Z", "end": "2024-02-15T04:30:00Z" }
+        }
+      },
+      {
+        "patientId": "P102",
+        "resourceType": "Observation",
+        "clinicalCode": "LOINC:8480-6",
+        "resourceData": {
+          "resourceType": "Observation",
+          "id": "OBS-205",
+          "status": "final",
+          "code": { "coding": [{ "system": "http://loinc.org", "code": "8480-6", "display": "Systolic blood pressure" }] },
+          "subject": { "reference": "Patient/P102" },
+          "valueQuantity": { "value": 118, "unit": "mm[Hg]", "system": "http://unitsofmeasure.org", "code": "mm[Hg]" }
+        }
+      },
+      {
+        "patientId": "P102",
+        "resourceType": "Observation",
+        "clinicalCode": "LOINC:8462-4",
+        "resourceData": {
+          "resourceType": "Observation",
+          "id": "OBS-206",
+          "status": "final",
+          "code": { "coding": [{ "system": "http://loinc.org", "code": "8462-4", "display": "Diastolic blood pressure" }] },
+          "subject": { "reference": "Patient/P102" },
+          "valueQuantity": { "value": 78, "unit": "mm[Hg]", "system": "http://unitsofmeasure.org", "code": "mm[Hg]" }
+        }
+      }
+    ],
+    "11107": [
+      {
+        "patientId": "P101",
+        "resourceType": "MedicationRequest",
+        "clinicalCode": "RxNorm:860975",
+        "resourceData": {
+          "resourceType": "MedicationRequest",
+          "id": "MED-601",
+          "status": "active",
+          "intent": "order",
+          "medicationCodeableConcept": { "coding": [{ "system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "860975", "display": "Metformin hydrochloride 500 MG Oral Tablet" }] },
+          "subject": { "reference": "Patient/P101" },
+          "dosageInstruction": [{ "text": "Take 500 mg orally twice daily with meals" }]
+        }
+      },
+      {
+        "patientId": "P101",
+        "resourceType": "MedicationRequest",
+        "clinicalCode": "RxNorm:284635",
+        "resourceData": {
+          "resourceType": "MedicationRequest",
+          "id": "MED-602",
+          "status": "active",
+          "intent": "order",
+          "medicationCodeableConcept": { "coding": [{ "system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "284635", "display": "Lisinopril 10 MG Oral Tablet" }] },
+          "subject": { "reference": "Patient/P101" },
+          "dosageInstruction": [{ "text": "Take 10 mg orally once daily" }]
+        }
+      },
+      {
+        "patientId": "P103",
+        "resourceType": "MedicationRequest",
+        "clinicalCode": "RxNorm:197361",
+        "resourceData": {
+          "resourceType": "MedicationRequest",
+          "id": "MED-603",
+          "status": "active",
+          "intent": "order",
+          "medicationCodeableConcept": { "coding": [{ "system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "197361", "display": "Amlodipine 5 MG Oral Tablet" }] },
+          "subject": { "reference": "Patient/P103" },
+          "dosageInstruction": [{ "text": "Take 5 mg orally once daily" }]
+        }
+      }
+    ]
   }
 }

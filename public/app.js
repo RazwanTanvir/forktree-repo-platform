@@ -56,32 +56,49 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Add Data Form
+  // Add Data Form (HL7 Patient Health Record)
   const formAddData = document.getElementById('form-add-data');
   if (formAddData) {
     formAddData.addEventListener('submit', async (e) => {
       e.preventDefault();
       const port = document.getElementById('add-target-port').value;
-      const dataValue = document.getElementById('add-value').value;
+      const patientId = document.getElementById('add-patient-id').value.trim();
+      const resourceType = document.getElementById('add-resource-type').value;
+      const clinicalCode = document.getElementById('add-clinical-code').value.trim();
+      const resourceDataStr = document.getElementById('add-resource-data').value.trim();
       const statusDiv = document.getElementById('add-data-status');
 
       statusDiv.className = 'alert-msg';
       statusDiv.style.display = 'block';
-      statusDiv.textContent = 'Submitting transaction...';
+      statusDiv.textContent = 'Submitting transaction to blockchain...';
+
+      let parsedData = resourceDataStr;
+      try {
+        parsedData = JSON.parse(resourceDataStr);
+      } catch (err) {
+        statusDiv.className = 'alert-msg show-error';
+        statusDiv.textContent = `Invalid JSON format: ${err.message}`;
+        return;
+      }
 
       try {
-        const res = await fetch('/api/add-data', {
+        const res = await fetch('/api/add-patient-record', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ port, dataValue })
+          body: JSON.stringify({
+            port,
+            patientId,
+            resourceType,
+            clinicalCode,
+            resourceData: parsedData
+          })
         });
         const json = await res.json();
 
         if (json.success) {
           statusDiv.className = 'alert-msg show-success';
-          statusDiv.textContent = `✓ ${json.message} (Tx: ${json.txHash ? json.txHash.slice(0, 16) : ''}...)`;
-          document.getElementById('add-value').value = '';
-          loadChainData(chainFilter.value);
+          statusDiv.textContent = `✓ ${json.message} (SHA-256: ${json.dataHash ? json.dataHash.slice(0, 16) : ''}...)`;
+          loadChainData(chainFilter ? chainFilter.value : 'all');
         } else {
           statusDiv.className = 'alert-msg show-error';
           statusDiv.textContent = `Error: ${json.error}`;
@@ -99,9 +116,10 @@ document.addEventListener('DOMContentLoaded', () => {
     formSearch.addEventListener('submit', async (e) => {
       e.preventDefault();
       const algorithm = document.getElementById('search-algorithm').value;
-      const searchValue = document.getElementById('search-value').value;
+      const searchValue = document.getElementById('search-value').value.trim();
       const startNetworkId = document.getElementById('search-root').value;
-      executeSearch(algorithm, startNetworkId, searchValue);
+      const queryType = document.getElementById('search-query-type') ? document.getElementById('search-query-type').value : null;
+      executeSearch(algorithm, startNetworkId, searchValue, queryType);
     });
   }
 
@@ -110,9 +128,12 @@ document.addEventListener('DOMContentLoaded', () => {
     chip.addEventListener('click', () => {
       const val = chip.getAttribute('data-search');
       const algo = chip.getAttribute('data-algo') || document.getElementById('search-algorithm').value;
+      const qType = chip.getAttribute('data-type') || '';
       document.getElementById('search-value').value = val;
       document.getElementById('search-algorithm').value = algo;
-      executeSearch(algo, 11102, val);
+      const qSelect = document.getElementById('search-query-type');
+      if (qSelect) qSelect.value = qType;
+      executeSearch(algo, 11102, val, qType || null);
     });
   });
 
@@ -555,7 +576,10 @@ function renderTreeSvg(svg, tree) {
   });
 }
 
-// Load Chain Data
+// Global in-memory record cache for modal viewer
+window.__currentRecords = [];
+
+// Load Chain Data (HL7 Patient Health Records)
 async function loadChainData(portFilter = 'all') {
   const tbody = document.getElementById('data-table-body');
   if (!tbody) return;
@@ -567,7 +591,9 @@ async function loadChainData(portFilter = 'all') {
       const json = await res.json();
       const all = json.data || {};
       Object.keys(all).forEach(port => {
-        rows.push(...all[port]);
+        if (Array.isArray(all[port])) {
+          rows.push(...all[port]);
+        }
       });
     } else {
       const res = await fetch(`/api/data/${portFilter}`);
@@ -575,27 +601,146 @@ async function loadChainData(portFilter = 'all') {
       rows = json.data || [];
     }
 
+    window.__currentRecords = rows;
+
     if (rows.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" class="text-center" style="color: var(--text-muted);">No data points found on this chain.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="text-center" style="color: var(--text-muted); padding: 24px;">No health records found on this chain.</td></tr>`;
       return;
     }
 
-    tbody.innerHTML = rows.map(pt => `
-      <tr>
-        <td><span class="badge badge-primary">#${pt.blockNumber}</span></td>
-        <td><code>${pt.networkId}</code></td>
-        <td><code>Port ${pt.portNumber}</code></td>
-        <td><strong style="color: var(--accent-gold); font-size: 14px;">${pt.data}</strong></td>
-        <td><span style="color: var(--text-secondary); font-size: 12px;">Stored via BlockData contract</span></td>
-      </tr>
-    `).join('');
+    tbody.innerHTML = rows.map((pt, idx) => {
+      const rType = pt.resourceType || 'Unknown';
+      const rTypeClass = `badge-resource-${rType.toLowerCase()}`;
+      const hashShort = pt.dataHash ? (pt.dataHash.slice(0, 10) + '...' + pt.dataHash.slice(-6)) : 'None';
+
+      return `
+        <tr>
+          <td><span class="badge badge-primary">#${pt.blockNumber}</span></td>
+          <td><code>Port ${pt.portNumber}</code></td>
+          <td><strong style="color: #58a6ff;">${pt.patientId || 'N/A'}</strong></td>
+          <td><span class="badge-resource ${rTypeClass}">${rType}</span></td>
+          <td><code>${pt.clinicalCode || '--'}</code></td>
+          <td><span style="font-family: var(--font-mono); font-size: 11px; color: var(--accent-gold);" title="${pt.dataHash || ''}">${hashShort}</span></td>
+          <td>
+            <button class="btn btn-sm btn-outline" onclick="viewFhirModalById(${idx})">View FHIR</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5" class="text-center show-error">Failed to load data: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center show-error">Failed to load data: ${err.message}</td></tr>`;
   }
 }
 
-// Execute Multi-Chain Tree Search (BFS or DFS)
-async function executeSearch(algorithm = 'BFS', startNetworkId = 11102, searchValue = 43) {
+// Modal inspection logic
+window.viewFhirModalById = function(idx) {
+  const rec = window.__currentRecords[idx];
+  if (rec) openFhirModal(rec);
+};
+
+window.viewFhirModalRecord = function(rec) {
+  if (rec) openFhirModal(rec);
+};
+
+function openFhirModal(rec) {
+  const modal = document.getElementById('fhir-modal');
+  if (!modal) return;
+
+  const rType = rec.resourceType || 'Resource';
+  const badge = document.getElementById('modal-badge');
+  badge.className = `badge-resource badge-resource-${rType.toLowerCase()}`;
+  badge.textContent = rType;
+
+  document.getElementById('modal-title').textContent = `${rType} Resource (${rec.patientId || 'Patient'})`;
+  document.getElementById('modal-patient-id').textContent = rec.patientId || 'N/A';
+  document.getElementById('modal-clinical-code').textContent = rec.clinicalCode || 'None';
+  document.getElementById('modal-block-num').textContent = `#${rec.blockNumber}`;
+  document.getElementById('modal-chain').textContent = `Chain ${rec.networkId} (Port ${rec.portNumber})`;
+  document.getElementById('modal-hash').textContent = rec.dataHash || 'None';
+
+  const dataObj = rec.resourceData || {};
+  document.getElementById('modal-json-pre').textContent = typeof dataObj === 'string' ? dataObj : JSON.stringify(dataObj, null, 2);
+
+  modal.style.display = 'flex';
+}
+
+function closeFhirModal() {
+  const modal = document.getElementById('fhir-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+// Wire up modal listeners
+document.addEventListener('DOMContentLoaded', () => {
+  const modalClose = document.getElementById('modal-close');
+  if (modalClose) modalClose.addEventListener('click', closeFhirModal);
+
+  const modal = document.getElementById('fhir-modal');
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeFhirModal();
+    });
+  }
+
+  const btnCopy = document.getElementById('modal-copy-btn');
+  if (btnCopy) {
+    btnCopy.addEventListener('click', () => {
+      const code = document.getElementById('modal-json-pre').textContent;
+      navigator.clipboard.writeText(code).then(() => {
+        btnCopy.textContent = '✓ Copied!';
+        setTimeout(() => { btnCopy.textContent = '📋 Copy JSON'; }, 1500);
+      });
+    });
+  }
+});
+
+// Helper to summarize FHIR JSON for the clinical timeline card
+function summarizeFhirResource(rec) {
+  const rType = rec.resourceType;
+  const d = rec.resourceData || {};
+
+  if (rType === 'Patient') {
+    const name = d.name && d.name[0] ? `${d.name[0].given ? d.name[0].given.join(' ') : ''} ${d.name[0].family || ''}` : rec.patientId;
+    return `<strong>${name}</strong> | DOB: ${d.birthDate || 'N/A'} | Gender: ${d.gender || 'N/A'} | Active: ${d.active ? 'Yes' : 'No'}`;
+  }
+
+  if (rType === 'Observation') {
+    const val = d.valueQuantity ? `${d.valueQuantity.value} ${d.valueQuantity.unit}` : 'Result logged';
+    const interp = d.interpretation && d.interpretation[0] && d.interpretation[0].display ? ` (${d.interpretation[0].display})` : '';
+    const display = (d.code && d.code.coding && d.code.coding[0] && d.code.coding[0].display) || rec.clinicalCode;
+    return `<strong>${display}</strong>: <span style="color: var(--accent-gold); font-weight: 600;">${val}${interp}</span>`;
+  }
+
+  if (rType === 'Condition') {
+    const display = (d.code && d.code.coding && d.code.coding[0] && d.code.coding[0].display) || rec.clinicalCode;
+    const onset = d.onsetDateTime ? ` | Onset: ${d.onsetDateTime}` : '';
+    return `<strong>Diagnosis:</strong> ${display}${onset}`;
+  }
+
+  if (rType === 'Encounter') {
+    const cls = (d.class && d.class.display) || (d.class && d.class.code) || 'Visit';
+    const period = d.period ? ` (${d.period.start ? d.period.start.slice(0, 10) : ''} to ${d.period.end ? d.period.end.slice(0, 10) : ''})` : '';
+    const type = (d.type && d.type[0] && d.type[0].display) || 'Clinical Encounter';
+    return `<strong>${cls}:</strong> ${type}${period}`;
+  }
+
+  if (rType === 'DiagnosticReport') {
+    return `<strong>Report:</strong> ${d.conclusion || 'Report completed'}`;
+  }
+
+  if (rType === 'MedicationRequest') {
+    const med = (d.medicationCodeableConcept && d.medicationCodeableConcept.coding && d.medicationCodeableConcept.coding[0] && d.medicationCodeableConcept.coding[0].display) || rec.clinicalCode;
+    const dose = (d.dosageInstruction && d.dosageInstruction[0] && d.dosageInstruction[0].text) || '';
+    return `<strong>Prescription:</strong> ${med} ${dose ? `<em>(${dose})</em>` : ''}`;
+  }
+
+  return `<code>${rec.clinicalCode}</code>: ${typeof d === 'string' ? d : JSON.stringify(d).slice(0, 100)}`;
+}
+
+// Global cache for longitudinal records returned in search
+window.__searchRecords = [];
+
+// Execute Multi-Chain Tree Search (BFS or DFS) with Longitudinal EHR Reconstruction
+async function executeSearch(algorithm = 'BFS', startNetworkId = 11102, searchValue = 'P101', queryType = null) {
   const container = document.getElementById('search-results-area');
   if (!container) return;
 
@@ -604,7 +749,7 @@ async function executeSearch(algorithm = 'BFS', startNetworkId = 11102, searchVa
   container.innerHTML = `
     <div class="empty-state">
       <div class="status-dot pulsing" style="width: 16px; height: 16px; margin: 0 auto 12px auto;"></div>
-      <p>Executing on-chain <strong>${algoName}</strong> across the blockchain tree for value <strong>${searchValue}</strong>...</p>
+      <p>Executing on-chain <strong>${algoName}</strong> across the blockchain tree for <strong>${searchValue}</strong>...</p>
     </div>
   `;
 
@@ -612,7 +757,7 @@ async function executeSearch(algorithm = 'BFS', startNetworkId = 11102, searchVa
     const res = await fetch('/api/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ algorithm, startNetworkId, searchValue })
+      body: JSON.stringify({ algorithm, startNetworkId, searchValue, queryType })
     });
     const json = await res.json();
     const result = json.result;
@@ -628,16 +773,16 @@ async function executeSearch(algorithm = 'BFS', startNetworkId = 11102, searchVa
           <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
             <span class="badge ${result.algorithm === 'BFS' ? 'badge-info' : 'badge-purple'}">${result.algorithm} Traversal</span>
             <span class="badge ${result.success ? 'badge-success' : 'badge-warning'}">
-              ${result.success ? 'Match Discovered' : 'No Matches'}
+              ${result.success ? 'Records Discovered' : 'No Matches'}
             </span>
           </div>
-          <h4>Target Value: <span style="color: var(--accent-gold); font-size: 18px;">${result.query.searchValue}</span></h4>
-          <p style="color: var(--text-secondary); font-size: 13px;">Root Chain: <code>${result.query.startNetworkId}</code> | Visited: <strong>${result.visitedCount}</strong> nodes | Matches: <strong>${result.matches.length}</strong></p>
+          <h4>Query: <span style="color: var(--accent-gold); font-size: 18px;">${result.query.searchValue}</span> <span style="font-size: 12px; color: var(--text-secondary); font-weight: normal;">(${result.query.queryType})</span></h4>
+          <p style="color: var(--text-secondary); font-size: 13px;">Root Chain: <code>${result.query.startNetworkId}</code> | Visited: <strong>${result.visitedCount}</strong> nodes | Matches: <strong>${result.matches.length}</strong> chains</p>
         </div>
       </div>
     `;
 
-    // Traversal Path Timeline
+    // Step-by-Step Traversal Route
     html += `
       <h4 style="font-size: 13px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">
         Step-by-Step ${result.algorithm} Traversal Route:
@@ -657,21 +802,74 @@ async function executeSearch(algorithm = 'BFS', startNetworkId = 11102, searchVa
             </div>
             <div class="step-sub">Network ID: ${step.networkId} | Port: ${step.port}</div>
           </div>
-          ${step.foundMatch ? `<div class="match-tag">★ MATCH DISCOVERED</div>` : `<span style="color: var(--text-muted); font-size: 12px;">Queried</span>`}
+          ${step.foundMatch ? `<div class="match-tag">★ RECORDS FOUND</div>` : `<span style="color: var(--text-muted); font-size: 12px;">Queried</span>`}
         </div>
       `;
     });
 
     html += `</div>`;
 
-    // Detailed matches card
-    if (result.matches.length > 0) {
+    // Longitudinal Electronic Health Record (EHR) Reconstruction
+    if (result.longitudinalRecord && result.longitudinalRecord.length > 0) {
+      window.__searchRecords = result.longitudinalRecord;
+      const patientId = result.longitudinalRecord[0].patientId || result.query.searchValue;
+      const distinctChains = new Set(result.longitudinalRecord.map(r => r.networkId)).size;
+
+      html += `
+        <div class="ehr-timeline-container">
+          <div class="ehr-header-bar">
+            <div>
+              <h3 style="font-size: 15px; margin: 0; color: #58a6ff; display: flex; align-items: center; gap: 8px;">
+                <span>🩺</span> Longitudinal Electronic Health Record (EHR)
+              </h3>
+              <p style="font-size: 12px; color: var(--text-secondary); margin: 2px 0 0 0;">
+                Patient: <strong>${patientId}</strong> | Consolidated <strong>${result.longitudinalRecord.length}</strong> clinical events across <strong>${distinctChains}</strong> blockchain branches.
+              </p>
+            </div>
+            <span class="badge badge-success">Cryptographically Verified</span>
+          </div>
+
+          <div class="ehr-records-grid">
+            ${result.longitudinalRecord.map((rec, rIdx) => {
+              const rType = rec.resourceType || 'Record';
+              const summaryText = summarizeFhirResource(rec);
+              const hashSnippet = rec.dataHash ? rec.dataHash.slice(0, 12) + '...' + rec.dataHash.slice(-6) : '';
+
+              return `
+                <div class="ehr-record-card type-${rType}">
+                  <div class="ehr-card-top">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span class="badge-resource badge-resource-${rType.toLowerCase()}">${rType}</span>
+                      <strong style="font-size: 13px; color: var(--text-primary);">${rec.clinicalCode || rType}</strong>
+                    </div>
+                    <div class="ehr-card-meta">
+                      <span>Chain ${rec.networkId} (Port ${rec.portNumber})</span>
+                      <span>Block #${rec.blockNumber}</span>
+                    </div>
+                  </div>
+
+                  <div class="ehr-card-content">
+                    ${summaryText}
+                  </div>
+
+                  <div class="ehr-card-footer">
+                    <span>SHA-256: <code style="color: var(--accent-gold); font-size: 10px;">${hashSnippet}</code></span>
+                    <button class="btn btn-sm btn-outline" onclick="viewSearchRecordById(${rIdx})">Inspect FHIR JSON</button>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    } else if (result.matches.length > 0) {
+      // Legacy integer match display
       html += `
         <div style="margin-top: 24px; padding: 16px; background: rgba(227, 179, 65, 0.08); border: 1px solid rgba(227, 179, 65, 0.3); border-radius: var(--radius-sm);">
           <h4 style="color: var(--accent-gold); font-size: 14px; margin-bottom: 8px;">✓ Matching Block Confirmation:</h4>
           ${result.matches.map(m => `
             <p style="font-size: 13px; color: var(--text-primary); margin-bottom: 4px;">
-              Chain <strong>${m.name}</strong> (Port <code>${m.port}</code>) matched target value <strong>${m.searchValue}</strong> at <strong>Block #${m.matchingBlocks.join(', #')}</strong> on <strong>${result.algorithm === 'BFS' ? 'Level' : 'Depth'} ${m.level !== undefined ? m.level : m.depth}</strong>.
+              Chain <strong>${m.name}</strong> (Port <code>${m.port}</code>) matched target <strong>${m.searchValue}</strong> at <strong>Block #${m.matchingBlocks.join(', #')}</strong> on <strong>${result.algorithm === 'BFS' ? 'Level' : 'Depth'} ${m.level !== undefined ? m.level : m.depth}</strong>.
             </p>
           `).join('')}
         </div>
@@ -684,6 +882,12 @@ async function executeSearch(algorithm = 'BFS', startNetworkId = 11102, searchVa
   }
 }
 
-// Retain alias for any legacy calls
+window.viewSearchRecordById = function(idx) {
+  const rec = window.__searchRecords[idx];
+  if (rec) openFhirModal(rec);
+};
+
+// Retain aliases for backward compatibility
 window.executeDfsSearch = (startNetworkId, searchValue) => executeSearch('DFS', startNetworkId, searchValue);
 window.executeSearch = executeSearch;
+
