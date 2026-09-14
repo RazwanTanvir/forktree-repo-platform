@@ -967,3 +967,279 @@ code {
   overflow-x: auto;
   max-height: 380px;
 }
+
+/* ==========================================================================
+   Shared Governance & Persona Switcher Styles
+   ========================================================================== */
+
+.persona-switcher-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(22, 27, 34, 0.95);
+  border: 1px solid rgba(56, 139, 253, 0.3);
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.persona-icon-display {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.persona-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.persona-top-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.persona-title-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.persona-dropdown {
+  background: #0d1117;
+  color: #58a6ff;
+  border: 1px solid rgba(56, 139, 253, 0.4);
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.persona-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.badge-role {
+  background: rgba(163, 113, 247, 0.2);
+  color: #d2a8ff;
+  border: 1px solid rgba(163, 113, 247, 0.4);
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.persona-org-text {
+  color: var(--text-secondary);
+}
+
+.persona-address-mono {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+/* Authorization Alert Banner */
+.auth-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 20px;
+  font-size: 13px;
+}
+
+.auth-allowed {
+  background: rgba(46, 160, 67, 0.12);
+  border: 1px solid rgba(46, 160, 67, 0.35);
+  color: #7ee787;
+}
+
+.auth-restricted {
+  background: rgba(218, 54, 51, 0.12);
+  border: 1px solid rgba(218, 54, 51, 0.35);
+  color: #f85149;
+}
+
+.auth-icon {
+  font-size: 22px;
+}
+
+.auth-text strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.auth-text p {
+  margin: 0;
+  opacity: 0.9;
+}
+
+/* Governance Proposals Grid & Cards */
+.proposals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 18px;
+}
+
+.proposal-card {
+  background: #161b22;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: all 0.2s ease;
+}
+
+.proposal-card:hover {
+  border-color: rgba(56, 139, 253, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.proposal-card.executed {
+  border-color: rgba(46, 160, 67, 0.4);
+  background: rgba(46, 160, 67, 0.04);
+}
+
+.proposal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.proposal-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #f0f6fc;
+  margin-bottom: 4px;
+}
+
+.proposal-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.proposal-justification {
+  background: #0d1117;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.vote-stats-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vote-stats-numbers {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.vote-stat-for { color: #7ee787; }
+.vote-stat-against { color: #f85149; }
+
+.vote-progress-track {
+  height: 8px;
+  background: #21262d;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+}
+
+.vote-progress-fill {
+  background: #2ea043;
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.proposal-actions-row {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.btn-vote-for {
+  flex: 1;
+  background: rgba(46, 160, 67, 0.15);
+  color: #7ee787;
+  border: 1px solid rgba(46, 160, 67, 0.4);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-vote-for:hover:not(:disabled) {
+  background: rgba(46, 160, 67, 0.3);
+}
+
+.btn-vote-against {
+  flex: 1;
+  background: rgba(218, 54, 51, 0.15);
+  color: #f85149;
+  border: 1px solid rgba(218, 54, 51, 0.4);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-vote-against:hover:not(:disabled) {
+  background: rgba(218, 54, 51, 0.3);
+}
+
+.btn-execute-proposal {
+  width: 100%;
+  background: #238636;
+  color: #fff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-execute-proposal:hover {
+  background: #2ea043;
+}
+
+.proposer-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.mono-code {
+  font-family: var(--font-mono);
+  background: #0d1117;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #58a6ff;
+  border: 1px solid var(--border-color);
+}

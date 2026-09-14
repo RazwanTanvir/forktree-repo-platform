@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BlockchainForkTree Dashboard & Search</title>
+  <title>BlockchainForkTree: Shared Consortium Governance & EHR Platform</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,16 +16,42 @@
       <div class="header-brand">
         <div class="logo-icon">🌿</div>
         <div>
-          <h1>BlockchainForkTree</h1>
-          <p class="subtitle">Hierarchical Multi-Chain Indexing, Fork Topology & DFS/BFS Search</p>
+          <h1>BlockchainForkTree <span class="header-tag">Consortium Governance</span></h1>
+          <p class="subtitle">Multi-Chain Healthcare Federation, Stakeholder RBAC & Cross-Chain Longitudinal EHR</p>
         </div>
       </div>
+      
+      <!-- Stakeholder Persona Switcher -->
+      <div class="persona-switcher-wrapper">
+        <div class="persona-icon-display" id="persona-avatar">🩺</div>
+        <div class="persona-details">
+          <div class="persona-top-row">
+            <span class="persona-title-label">Active Stakeholder:</span>
+            <select id="persona-select" class="persona-dropdown">
+              <option value="metro-clinician">Dr. Alice Smith (Metro Clinician)</option>
+              <option value="metro-admin">Dr. Arthur Vance (Metro Hospital Admin)</option>
+              <option value="biolabs-admin">Marcus Sterling (BioLabs Admin)</option>
+              <option value="biolabs-specialist">Bob Martinez (BioLabs Lab Specialist)</option>
+              <option value="cardio-specialist">Dr. Carol Lin (Cardiology Specialist)</option>
+              <option value="emergency-physician">Dr. Dave Ross (ER Physician)</option>
+              <option value="consortium-auditor">Elena Rostova (Consortium Auditor)</option>
+              <option value="patient-p101">Johnathan Doe (Patient P101)</option>
+            </select>
+          </div>
+          <div class="persona-meta-row">
+            <span id="persona-badge" class="badge badge-role">CLINICIAN</span>
+            <span id="persona-org" class="persona-org-text">Metro General Hospital (:8547)</span>
+            <span id="persona-address" class="persona-address-mono">0x2222...2222</span>
+          </div>
+        </div>
+      </div>
+
       <div class="header-actions">
         <div class="status-indicator">
           <span class="status-dot pulsing"></span>
-          <span id="global-status">7 Chains Active</span>
+          <span id="global-status">Consortium Active</span>
         </div>
-        <button id="btn-reseed" class="btn btn-outline" title="Reset all chains, redeploy contracts, and re-seed sample data">
+        <button id="btn-reseed" class="btn btn-outline btn-sm" title="Reset all chains, redeploy contracts, and re-seed sample data">
           ↺ Reset & Reseed
         </button>
       </div>
@@ -36,11 +62,14 @@
       <button class="tab-btn active" data-tab="tree">
         <span class="tab-icon">🌳</span> Fork Tree Topology
       </button>
+      <button class="tab-btn" data-tab="governance">
+        <span class="tab-icon">🏛️</span> Shared Governance
+      </button>
       <button class="tab-btn" data-tab="nodes">
-        <span class="tab-icon">⚡</span> Nodes Monitor
+        <span class="tab-icon">⚡</span> Organizations & Nodes
       </button>
       <button class="tab-btn" data-tab="data">
-        <span class="tab-icon">📊</span> Data Explorer
+        <span class="tab-icon">🩺</span> Longitudinal EHR Explorer
       </button>
       <button class="tab-btn" data-tab="search">
         <span class="tab-icon">🔍</span> Multi-Chain Search (DFS / BFS)
@@ -55,15 +84,14 @@
       <div class="grid-2-col">
         <div class="card">
           <div class="card-header">
-            <h3>Interactive Fork Tree Architecture</h3>
+            <h3>Consortium Fork Tree Architecture</h3>
             <span class="badge badge-primary">Dynamic Graph</span>
           </div>
           <div class="card-body">
             <p class="section-desc">
-              Visualizes the parent-child relationships among the forked blockchains. Root chain <code>11102</code> branches into child chains at specific fork block heights.
+              Visualizes the parent-child relationships among the consortium blockchains. Root chain <code>11102</code> (MPI) branches into specialized organizational forks.
             </p>
             <div id="tree-canvas-container" class="tree-canvas-container">
-              <!-- Rendered via app.js SVG -->
               <svg id="tree-svg" width="100%" height="450"></svg>
             </div>
           </div>
@@ -71,36 +99,36 @@
 
         <div class="card">
           <div class="card-header">
-            <h3>How This Forked System Works</h3>
-            <span class="badge badge-info">Architecture Overview</span>
+            <h3>Consortium & Security Architecture</h3>
+            <span class="badge badge-info">Decentralized Healthcare</span>
           </div>
           <div class="card-body system-explainer">
             <div class="explainer-item">
               <div class="explainer-num">1</div>
               <div>
-                <h4>Metadata Repository Blockchain (Port 8545)</h4>
-                <p>Hosts the <code>StoreForkEvent</code> contract. It maintains the registry of every fork event and builds an adjacency list mapping parent chains to child branches.</p>
+                <h4>Shared Governance Chain (Port 8545 / Net 11101)</h4>
+                <p>Hosts <code>ConsortiumGovernance.sol</code>. Member organizations submit fork proposals, cast multi-stakeholder votes, and anchor the official parent-child federation topology.</p>
               </div>
             </div>
             <div class="explainer-item">
               <div class="explainer-num">2</div>
               <div>
-                <h4>Independent Data Chains (Ports 8546–8551)</h4>
-                <p>Each blockchain is an isolated EVM network running its own <code>BlockData</code> contract. Data points can be added at any block height on any branch.</p>
+                <h4>Organization-Owned Blockchains (Ports 8546–8551+)</h4>
+                <p>Each hospital, lab, or clinic operates an independent blockchain governed by its own stakeholders with smart-contract enforced Role-Based Access Control (RBAC).</p>
               </div>
             </div>
             <div class="explainer-item">
               <div class="explainer-num">3</div>
               <div>
-                <h4>Fork Provenance & Fork Blocks</h4>
-                <p>When Chain B forks from Chain A at block $H$, Chain B inherits historical data up to block $H$, while creating an independent branch for subsequent transactions.</p>
+                <h4>Protected Health Information (PHI) & SHA-256 Digest</h4>
+                <p>Clinical resources are cryptographically hashed and digitally attributed. Only authorized clinicians can commit patient records to their organization ledger.</p>
               </div>
             </div>
             <div class="explainer-item">
               <div class="explainer-num">4</div>
               <div>
-                <h4>Cross-Chain DFS Traversal Search</h4>
-                <p>Queries the repository for the fork graph adjacency list, then recursively visits branches in Depth-First Search order, calling smart contract search methods on each target chain.</p>
+                <h4>Cross-Chain Longitudinal EHR Reconstruction</h4>
+                <p>Graph traversal algorithms (BFS/DFS) query authorized nodes in level-by-level or branch-by-branch order to reconstruct a unified clinical history.</p>
               </div>
             </div>
           </div>
@@ -108,201 +136,314 @@
       </div>
     </section>
 
-    <!-- TAB 2: Nodes Monitor -->
+    <!-- TAB 2: Shared Governance (NEW) -->
+    <section id="tab-governance" class="tab-content">
+      <div class="grid-2-col">
+        <!-- Member Organizations Directory -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>Consortium Member Organizations</h3>
+              <p class="card-subtitle">Decentralized federation members with on-chain governance rights</p>
+            </div>
+            <span class="badge badge-success" id="org-count-badge">6 Organizations</span>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Org ID</th>
+                    <th>Organization Name</th>
+                    <th>Type</th>
+                    <th>Network ID</th>
+                    <th>Port</th>
+                    <th>Admin Address</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="governance-orgs-tbody">
+                  <tr><td colspan="7" class="loading-cell">Loading consortium members...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Propose New Fork Form -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>Submit Fork / Organization Proposal</h3>
+              <p class="card-subtitle">Propose adding a new clinical blockchain branch to the consortium</p>
+            </div>
+            <span class="badge badge-primary">On-Chain Proposal</span>
+          </div>
+          <div class="card-body">
+            <form id="form-submit-proposal" class="governance-form">
+              <div class="form-group">
+                <label for="prop-org-name">Organization / Branch Name:</label>
+                <input type="text" id="prop-org-name" class="form-control" placeholder="e.g. Children's Health Specialty Clinic" required>
+              </div>
+              <div class="form-row">
+                <div class="form-group col-half">
+                  <label for="prop-parent-chain">Parent Blockchain to Fork:</label>
+                  <select id="prop-parent-chain" class="form-control" required>
+                    <!-- Populated dynamically -->
+                  </select>
+                </div>
+                <div class="form-group col-half">
+                  <label for="prop-org-type">Organization Type:</label>
+                  <select id="prop-org-type" class="form-control">
+                    <option value="Specialty Clinic">Specialty Clinic</option>
+                    <option value="Hospital Inpatient">Hospital Inpatient</option>
+                    <option value="Diagnostic Pathology">Diagnostic Pathology</option>
+                    <option value="Emergency Care">Emergency Care</option>
+                    <option value="Research & Genomics">Research & Genomics</option>
+                    <option value="Pharmacy Network">Pharmacy Network</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="prop-justification">Clinical Justification & Governance Intent:</label>
+                <textarea id="prop-justification" class="form-control" rows="3" placeholder="Describe the clinical services, data privacy requirements, and justification for forking..." required></textarea>
+              </div>
+              <div class="governance-submit-row">
+                <div class="proposer-preview">
+                  <span class="small-label">Proposer Address:</span>
+                  <code id="prop-current-proposer" class="mono-code">0x1111...1111</code>
+                </div>
+                <button type="submit" id="btn-submit-proposal" class="btn btn-primary">
+                  📜 Submit Proposal to Consortium
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Proposals & Live Voting Panel -->
+      <div class="card mt-4">
+        <div class="card-header">
+          <div>
+            <h3>Consortium Governance Proposals & Voting</h3>
+            <p class="card-subtitle">Active and historical proposals requiring member consensus before node execution</p>
+          </div>
+          <button id="btn-refresh-proposals" class="btn btn-outline btn-sm">↻ Refresh Proposals</button>
+        </div>
+        <div class="card-body">
+          <div id="proposals-list-container" class="proposals-grid">
+            <div class="empty-state">Loading governance proposals...</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: Nodes Monitor -->
     <section id="tab-nodes" class="tab-content">
       <div class="card">
         <div class="card-header">
-          <h3>Blockchain Nodes Live Status</h3>
-          <button id="btn-refresh-nodes" class="btn btn-sm btn-outline">↻ Refresh</button>
+          <h3>Multi-Chain Consortium Infrastructure</h3>
+          <span class="badge badge-success">Live RPC Monitoring</span>
         </div>
         <div class="card-body">
           <div id="nodes-grid" class="nodes-grid">
             <!-- Node cards injected via app.js -->
-            <div class="loading-spinner">Loading nodes...</div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- TAB 3: Data Explorer -->
+    <!-- TAB 4: Data Explorer -->
     <section id="tab-data" class="tab-content">
-      <div class="grid-3-col">
-        <div class="col-main">
-          <div class="card">
-            <div class="card-header">
-              <div>
-                <h3>HL7 FHIR Healthcare Data Explorer</h3>
-                <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">
-                  Inspect on-chain Patient Health Records secured with SHA-256 integrity hashes across fork tree branches.
-                </p>
-              </div>
-              <div class="filter-group">
-                <label for="chain-filter">Select Chain:</label>
-                <select id="chain-filter" class="form-select">
-                  <option value="all">All Chains (Cross-Chain Aggregate)</option>
-                  <option value="8546">Port 8546 (Root 11102 - Master Patient Index)</option>
-                  <option value="8547">Port 8547 (Fork Alpha 11103 - Inpatient)</option>
-                  <option value="8548">Port 8548 (Fork Beta 11104 - Labs & Diagnostics)</option>
-                  <option value="8549">Port 8549 (Fork Gamma 11105 - Cardiology)</option>
-                  <option value="8550">Port 8550 (Fork Delta 11106 - Emergency Triage)</option>
-                  <option value="8551">Port 8551 (Fork Epsilon 11107 - Pharmacy)</option>
-                </select>
-              </div>
+      <!-- Authorization Status Alert Banner -->
+      <div id="auth-status-banner" class="auth-banner auth-allowed">
+        <span class="auth-icon">🛡️</span>
+        <div class="auth-text">
+          <strong id="auth-status-title">Authorized Clinician Access</strong>
+          <p id="auth-status-desc">You are operating as Dr. Alice Smith (Metro General Hospital). You have full authorization to commit patient records to Port 8547.</p>
+        </div>
+      </div>
+
+      <div class="grid-data-layout">
+        <!-- Records Table -->
+        <div class="card data-table-card">
+          <div class="card-header">
+            <div>
+              <h3>Consortium Electronic Health Records (HL7 FHIR)</h3>
+              <p class="card-subtitle">Cryptographically verified patient health records stored across forked organizational ledgers</p>
             </div>
-            <div class="card-body">
-              <div class="table-responsive">
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th>Block #</th>
-                      <th>Blockchain</th>
-                      <th>Patient ID</th>
-                      <th>HL7 Resource</th>
-                      <th>Clinical Code</th>
-                      <th>SHA-256 Hash</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody id="data-table-body">
-                    <tr><td colspan="7" class="text-center">Loading chain data...</td></tr>
-                  </tbody>
-                </table>
-              </div>
+            <div class="data-filters">
+              <select id="data-chain-filter" class="form-control form-control-sm">
+                <option value="all">All Organizations / Blockchains</option>
+              </select>
+              <button id="btn-refresh-data" class="btn btn-outline btn-sm">↻ Refresh</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Block #</th>
+                    <th>Organization / Blockchain</th>
+                    <th>Patient ID</th>
+                    <th>HL7 Resource</th>
+                    <th>Clinical Code</th>
+                    <th>SHA-256 Hash</th>
+                    <th>Recorded At</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="data-table-tbody">
+                  <tr><td colspan="8" class="loading-cell">Loading records...</td></tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
 
-        <div class="col-side">
-          <div class="card">
-            <div class="card-header">
-              <h3>Store Patient Record</h3>
-            </div>
-            <div class="card-body">
-              <form id="form-add-data">
-                <div class="form-group">
-                  <label for="add-target-port">Target Blockchain:</label>
-                  <select id="add-target-port" class="form-select" required>
-                    <option value="8546">Port 8546 (Root 11102 - Demographics)</option>
-                    <option value="8547">Port 8547 (Fork Alpha 11103 - Inpatient)</option>
-                    <option value="8548">Port 8548 (Fork Beta 11104 - Labs)</option>
-                    <option value="8549">Port 8549 (Fork Gamma 11105 - Cardiology)</option>
-                    <option value="8550">Port 8550 (Fork Delta 11106 - Emergency)</option>
-                    <option value="8551">Port 8551 (Fork Epsilon 11107 - Pharmacy)</option>
-                  </select>
+        <!-- Add HL7 Record Form -->
+        <div class="card add-record-card">
+          <div class="card-header">
+            <h3>Add Patient Record (HL7 FHIR)</h3>
+            <span class="badge badge-secondary" id="write-perm-badge">🔒 RBAC Gated</span>
+          </div>
+          <div class="card-body">
+            <form id="form-add-patient-record">
+              <div class="form-group">
+                <label for="patient-chain-select">Target Blockchain (Organization):</label>
+                <select id="patient-chain-select" class="form-control" required>
+                  <!-- Injected via app.js -->
+                </select>
+                <small id="chain-auth-hint" class="form-hint">Checking stakeholder authorization...</small>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group col-half">
+                  <label for="patient-id-input">Patient ID / MRN:</label>
+                  <input type="text" id="patient-id-input" class="form-control" placeholder="e.g. P101" required>
                 </div>
-                <div class="form-group">
-                  <label for="add-patient-id">Patient ID:</label>
-                  <input type="text" id="add-patient-id" class="form-input" placeholder="e.g. P101 or MRN-104" value="P101" required />
-                </div>
-                <div class="form-group">
-                  <label for="add-resource-type">HL7 Resource Type:</label>
-                  <select id="add-resource-type" class="form-select" required>
-                    <option value="Observation" selected>Observation (Lab, Vitals)</option>
+                <div class="form-group col-half">
+                  <label for="resource-type-select">Resource Type:</label>
+                  <select id="resource-type-select" class="form-control" required>
+                    <option value="Observation">Observation (Vitals/Labs)</option>
                     <option value="Condition">Condition (Diagnosis)</option>
                     <option value="Encounter">Encounter (Visit)</option>
-                    <option value="DiagnosticReport">DiagnosticReport (EKG, Imaging)</option>
+                    <option value="DiagnosticReport">DiagnosticReport (EKG/Pathology)</option>
                     <option value="MedicationRequest">MedicationRequest (Rx)</option>
                     <option value="Patient">Patient (Demographics)</option>
                   </select>
                 </div>
-                <div class="form-group">
-                  <label for="add-clinical-code">Clinical Code (LOINC / ICD-10):</label>
-                  <input type="text" id="add-clinical-code" class="form-input" placeholder="e.g. LOINC:15074-8 or ICD-10:E11.9" value="LOINC:15074-8" required />
-                </div>
-                <div class="form-group">
-                  <label for="add-resource-data">FHIR Resource Data (JSON):</label>
-                  <textarea id="add-resource-data" class="form-input" rows="4" style="font-family: var(--font-mono); font-size: 11px;">{
-  "resourceType": "Observation",
-  "status": "final",
-  "code": { "coding": [{ "system": "http://loinc.org", "code": "15074-8", "display": "Glucose" }] },
-  "valueQuantity": { "value": 142, "unit": "mg/dL" }
-}</textarea>
-                </div>
-                <button type="submit" class="btn btn-primary btn-block">Commit to Blockchain</button>
-                <div id="add-data-status" class="alert-msg"></div>
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
+              </div>
 
-    <!-- TAB 4: Multi-Chain Tree Search (DFS / BFS) -->
-    <section id="tab-search" class="tab-content">
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <h3>Multi-Chain Longitudinal EHR Search Traversal</h3>
-            <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">
-              Traverse distributed healthcare blockchains using BFS or DFS to reconstruct a patient's complete longitudinal record.
-            </p>
-          </div>
-          <span class="badge badge-success">On-Chain Healthcare Indexing</span>
-        </div>
-        <div class="card-body">
-          <form id="form-search" class="search-form">
-            <div class="search-input-wrapper">
-              <div class="form-group" style="max-width: 170px;">
-                <label for="search-algorithm">Traversal Algorithm:</label>
-                <select id="search-algorithm" class="form-select">
-                  <option value="BFS" selected>BFS (Breadth-First)</option>
-                  <option value="DFS">DFS (Depth-First)</option>
-                </select>
-              </div>
-              <div class="form-group" style="max-width: 200px;">
-                <label for="search-root">Start Node (Root):</label>
-                <select id="search-root" class="form-select">
-                  <option value="11102" selected>Root 11102 (Port 8546)</option>
-                  <option value="11103">Alpha 11103 (Port 8547)</option>
-                  <option value="11104">Beta 11104 (Port 8548)</option>
-                </select>
-              </div>
-              <div class="form-group" style="max-width: 170px;">
-                <label for="search-query-type">Query Field:</label>
-                <select id="search-query-type" class="form-select">
-                  <option value="" selected>Auto-Detect</option>
-                  <option value="patientId">Patient ID</option>
-                  <option value="resourceType">HL7 Resource</option>
-                  <option value="keyword">Clinical Code / Keyword</option>
-                  <option value="integer">Legacy Integer</option>
-                </select>
-              </div>
               <div class="form-group">
-                <label for="search-value">Target Query Value:</label>
-                <input type="text" id="search-value" class="form-input" value="P101" placeholder="e.g. P101, Observation, E11.9, 43..." required />
+                <label for="clinical-code-input">Clinical Code (LOINC / ICD-10 / RxNorm / CPT):</label>
+                <input type="text" id="clinical-code-input" class="form-control" placeholder="e.g. LOINC:15074-8 (Blood Glucose)" required>
               </div>
-              <button type="submit" id="btn-search-submit" class="btn btn-primary search-btn">Run Search</button>
-            </div>
-          </form>
 
-          <!-- Algorithm Explanation Cards -->
-          <div class="algo-info-grid">
-            <div class="algo-info-card">
-              <div class="algo-info-title">
-                <span class="badge badge-info">BFS</span> <strong>Breadth-First Search (Level-by-Level)</strong>
+              <div class="form-group">
+                <label for="resource-data-input">HL7 FHIR Resource JSON Payload:</label>
+                <textarea id="resource-data-input" class="form-control code-font" rows="5" placeholder='{"resourceType": "Observation", "code": {"coding": [{"system": "http://loinc.org", "code": "15074-8"}]}, "valueQuantity": {"value": 140, "unit": "mg/dL"}}' required></textarea>
               </div>
-              <p>Traverses the tree level-by-level (Root MPI &rarr; Level 1 Main Specialities &rarr; Level 2 Sub-clinics). Optimal for discovering primary care summaries before drilling into specialized sub-forks.</p>
-            </div>
-            <div class="algo-info-card">
-              <div class="algo-info-title">
-                <span class="badge badge-purple">DFS</span> <strong>Depth-First Search (Lineage Trace)</strong>
-              </div>
-              <p>Dives deep into a specific clinical department's branch before backtracking (Root &rarr; Inpatient Alpha &rarr; Cardiology Gamma &rarr; Emergency Delta). Ideal for full episode-of-care reconstruction.</p>
+
+              <button type="submit" id="btn-commit-record" class="btn btn-primary btn-block">
+                🔒 Commit Record with Clinician Credentials
+              </button>
+              <div id="add-record-result" class="add-result-msg"></div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: Search -->
+    <section id="tab-search" class="tab-content">
+      <div class="search-layout">
+        <!-- Search Controls -->
+        <div class="card search-control-card">
+          <div class="card-header">
+            <div>
+              <h3>Cross-Chain Longitudinal EHR Reconstruction</h3>
+              <p class="card-subtitle">Traverse the organization fork tree using BFS or DFS algorithms</p>
             </div>
           </div>
+          <div class="card-body">
+            <form id="form-search">
+              <div class="search-algorithm-selector">
+                <label class="radio-card">
+                  <input type="radio" name="algorithm" value="BFS" checked>
+                  <div class="radio-card-content">
+                    <span class="algo-name">Breadth-First Search (BFS)</span>
+                    <span class="algo-desc">Level-by-level cross-organization traversal</span>
+                  </div>
+                </label>
+                <label class="radio-card">
+                  <input type="radio" name="algorithm" value="DFS">
+                  <div class="radio-card-content">
+                    <span class="algo-name">Depth-First Search (DFS)</span>
+                    <span class="algo-desc">Deep branch-by-branch clinic lineage traversal</span>
+                  </div>
+                </label>
+              </div>
 
-          <div id="search-results-area" class="search-results-area">
-            <!-- Injected via app.js -->
-            <div class="empty-state">
-              <div class="empty-icon">🩺</div>
-              <p>Select your algorithm (<strong>BFS</strong> or <strong>DFS</strong>), enter a target (e.g. Patient <strong>P101</strong>), and click <strong>Run Search</strong> to reconstruct the patient's EHR across the blockchain tree.</p>
-              <div class="search-hints">
-                <span>Try quick searches:</span>
-                <button type="button" class="chip" data-search="P101" data-algo="BFS" data-type="patientId">Patient P101 with BFS (Level-by-level)</button>
-                <button type="button" class="chip" data-search="P101" data-algo="DFS" data-type="patientId">Patient P101 with DFS (Deep branch)</button>
-                <button type="button" class="chip" data-search="Observation" data-algo="BFS" data-type="resourceType">All Observations (Labs & Vitals)</button>
-                <button type="button" class="chip" data-search="E11.9" data-algo="DFS" data-type="keyword">Condition: Diabetes (E11.9)</button>
-                <button type="button" class="chip" data-search="43" data-algo="BFS" data-type="integer">Integer 43 (Legacy)</button>
+              <div class="search-input-row">
+                <div class="form-group col-quarter">
+                  <label for="search-query-type">Query Type:</label>
+                  <select id="search-query-type" class="form-control">
+                    <option value="patientId">Patient ID (e.g. P101)</option>
+                    <option value="resourceType">Resource Type</option>
+                    <option value="keyword">Diagnosis / Code</option>
+                    <option value="integer">Legacy Integer</option>
+                  </select>
+                </div>
+                <div class="form-group col-half">
+                  <label for="search-value-input">Search Query:</label>
+                  <input type="text" id="search-value-input" class="form-control form-control-lg" placeholder="Enter Patient ID (e.g., P101)..." value="P101" required>
+                </div>
+                <div class="form-group col-quarter search-btn-col">
+                  <button type="submit" id="btn-run-search" class="btn btn-primary btn-lg btn-block">
+                    🔍 Execute Traversal
+                  </button>
+                </div>
+              </div>
+
+              <div class="quick-search-chips">
+                <span class="chips-label">Quick Lookups:</span>
+                <button type="button" class="chip-btn" data-query="P101" data-type="patientId">👤 Patient P101 (All Clinics)</button>
+                <button type="button" class="chip-btn" data-query="Observation" data-type="resourceType">🧪 All Lab Observations</button>
+                <button type="button" class="chip-btn" data-query="E11.9" data-type="keyword">🩺 Type 2 Diabetes (E11.9)</button>
+                <button type="button" class="chip-btn" data-query="43" data-type="integer">🔢 Legacy Value 43</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Search Results View -->
+        <div id="search-results-section" class="search-results-section" style="display: none;">
+          <div class="grid-2-col">
+            <!-- Traversal Route -->
+            <div class="card">
+              <div class="card-header">
+                <h3>Tree Traversal Route</h3>
+                <span id="search-algo-badge" class="badge badge-primary">BFS Traversal</span>
+              </div>
+              <div class="card-body">
+                <div id="traversal-stats" class="traversal-stats"></div>
+                <div id="traversal-route-list" class="traversal-route-list"></div>
+              </div>
+            </div>
+
+            <!-- Longitudinal EHR Timeline -->
+            <div class="card">
+              <div class="card-header">
+                <h3>Longitudinal Patient EHR Timeline</h3>
+                <span id="search-matches-badge" class="badge badge-success">0 Events Found</span>
+              </div>
+              <div class="card-body">
+                <div id="ehr-timeline-container" class="ehr-timeline-container">
+                  <div class="empty-state">No matching events found.</div>
+                </div>
               </div>
             </div>
           </div>
@@ -310,146 +451,87 @@
       </div>
     </section>
 
-    <!-- TAB 5: Spin Up New Forked Blockchain -->
+    <!-- TAB 6: Spin Up Fork -->
     <section id="tab-create-fork" class="tab-content">
       <div class="grid-2-col">
-        <!-- Form Card -->
         <div class="card">
           <div class="card-header">
             <div>
               <h3>Spin Up New Forked Blockchain</h3>
-              <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">
-                Fork a new independent blockchain node from the Root chain or any existing branch.
-              </p>
+              <p class="card-subtitle">Direct node spawner for rapid development & testing</p>
             </div>
-            <span class="badge badge-success">Dynamic Node Spawner</span>
+            <span class="badge badge-primary">Dynamic Node Spawner</span>
           </div>
           <div class="card-body">
             <form id="form-create-fork">
               <div class="form-group">
-                <label for="fork-name">Blockchain Name:</label>
-                <input type="text" id="fork-name" class="form-input" placeholder="e.g. Fork Zeta (from Beta)" required />
+                <label for="fork-chain-name">Blockchain / Clinic Name:</label>
+                <input type="text" id="fork-chain-name" class="form-control" placeholder="e.g. Fork Zeta - Oncology Specialty Clinic" required>
               </div>
-
               <div class="form-group">
                 <label for="fork-parent-select">Parent Chain to Fork From:</label>
-                <select id="fork-parent-select" class="form-select" required>
-                  <!-- Populated dynamically via /api/chains -->
-                  <option value="11102" selected>Root Blockchain 11102 (Port 8546)</option>
-                </select>
-                <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;">
-                  Only <code>11102</code> is the Root chain. Every other blockchain forks from an existing node in the tree hierarchy.
-                </span>
+                <select id="fork-parent-select" class="form-control" required></select>
               </div>
-
               <div class="form-group">
-                <label for="fork-block-num">Fork Block Height:</label>
-                <div style="display: flex; gap: 8px;">
-                  <input type="number" id="fork-block-num" class="form-input" min="0" value="0" style="flex: 1;" required />
-                  <button type="button" id="btn-use-latest-block" class="btn btn-outline" style="white-space: nowrap; font-size: 12px;">Use Latest</button>
+                <label for="fork-block-input">Fork Block Height:</label>
+                <div class="input-with-action">
+                  <input type="number" id="fork-block-input" class="form-control" placeholder="Block height where state diverges" min="0">
+                  <button type="button" id="btn-use-latest-block" class="btn btn-outline">Use Latest</button>
                 </div>
-                <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;">
-                  The parent chain block number at which the state divergence occurs.
-                </span>
               </div>
-
               <div class="form-group">
-                <label for="fork-initial-data">Initial Data Points (Optional, Comma-Separated):</label>
-                <input type="text" id="fork-initial-data" class="form-input" placeholder="e.g. 81, 82, 83" />
-                <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;">
-                  Pre-seed integer data points into the new chain's <code>BlockData</code> contract upon boot.
-                </span>
+                <label for="fork-initial-data">Initial Legacy Data Points (Optional, Comma-Separated):</label>
+                <input type="text" id="fork-initial-data" class="form-control" placeholder="e.g. 888, 889">
               </div>
-
-              <button type="submit" id="btn-submit-fork" class="btn btn-primary btn-block" style="padding: 12px; font-size: 14px; font-weight: 600;">
+              <button type="submit" id="btn-start-fork" class="btn btn-primary btn-lg btn-block">
                 🚀 Start & Spin Up Node
               </button>
             </form>
-
-            <div id="fork-create-progress" class="fork-progress-container" style="display: none;">
-              <h4 style="font-size: 13px; color: var(--accent-cyan); margin-bottom: 10px;">Spin-Up Lifecycle:</h4>
-              <ul class="progress-steps-list">
-                <li id="step-port" class="progress-step-item pending">1. Allocate dynamic Port & Chain ID</li>
-                <li id="step-node" class="progress-step-item pending">2. Boot JSON-RPC 2.0 Ethereum node</li>
-                <li id="step-contract" class="progress-step-item pending">3. Deploy BlockData smart contract</li>
-                <li id="step-repo" class="progress-step-item pending">4. Register fork event in StoreForkEvent (Port 8545)</li>
-                <li id="step-data" class="progress-step-item pending">5. Ingest initial data points</li>
-              </ul>
-            </div>
-
-            <div id="fork-create-result" style="display: none; margin-top: 16px;"></div>
           </div>
         </div>
 
-        <!-- Explainer Card -->
         <div class="card">
           <div class="card-header">
-            <h3>How Fork Spawning Works</h3>
-            <span class="badge badge-info">System Architecture</span>
+            <h3>Spin-Up Execution Lifecycle</h3>
+            <span id="spinup-status-badge" class="badge badge-secondary">Idle</span>
           </div>
           <div class="card-body">
-            <div class="system-explainer">
-              <div class="explainer-item">
-                <div class="explainer-num">1</div>
-                <div>
-                  <h4>Single Root Origin</h4>
-                  <p>Chain <code>11102</code> (Port 8546) is the single immutable root blockchain. All other chains in the system are forked blockchains that inherit parent state up to their designated fork block height.</p>
-                </div>
-              </div>
-              <div class="explainer-item">
-                <div class="explainer-num">2</div>
-                <div>
-                  <h4>Zero-Downtime Dynamic Port Allocation</h4>
-                  <p>The multi-chain engine dynamically assigns an unused port (e.g. <code>8552</code>, <code>8553</code>) and starts a new isolated JSON-RPC server on localhost without restarting the existing nodes.</p>
-                </div>
-              </div>
-              <div class="explainer-item">
-                <div class="explainer-num">3</div>
-                <div>
-                  <h4>Automatic Smart Contract Provisioning</h4>
-                  <p>A fresh <code>BlockData.sol</code> contract is deployed to the new chain. The parent-child fork edge is simultaneously logged in the central <code>StoreForkEvent.sol</code> repository on Port 8545.</p>
-                </div>
-              </div>
-              <div class="explainer-item">
-                <div class="explainer-num">4</div>
-                <div>
-                  <h4>Live Visual & Traversal Integration</h4>
-                  <p>As soon as the node is spun up, the interactive SVG tree topology graph adds the new node, the node monitor tracks its block height, and both BFS/DFS algorithms will traverse it.</p>
-                </div>
-              </div>
+            <div class="spinup-steps" id="spinup-steps-list">
+              <div class="step-item" id="step-1"><span class="step-num">1</span><span>Allocate dynamic port & network ID</span></div>
+              <div class="step-item" id="step-2"><span class="step-num">2</span><span>Launch JSON-RPC HTTP node</span></div>
+              <div class="step-item" id="step-3"><span class="step-num">3</span><span>Deploy BlockData contract</span></div>
+              <div class="step-item" id="step-4"><span class="step-num">4</span><span>Register fork lineage in Consortium Governance</span></div>
+              <div class="step-item" id="step-5"><span class="step-num">5</span><span>Seed initial clinical records</span></div>
             </div>
+            <div id="spinup-result-panel" class="spinup-result-panel" style="display: none;"></div>
           </div>
         </div>
       </div>
     </section>
   </div>
 
-  <!-- HL7 FHIR JSON Inspector Modal -->
+  <!-- FHIR JSON Modal Dialog -->
   <div id="fhir-modal" class="modal-overlay" style="display: none;">
     <div class="modal-card">
       <div class="modal-header">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span id="modal-badge" class="badge-resource badge-resource-observation">Resource</span>
-          <h3 id="modal-title" style="margin: 0; font-size: 16px;">HL7 FHIR Resource Inspector</h3>
+        <div>
+          <h3 id="modal-title">HL7 FHIR Resource Payload</h3>
+          <p id="modal-subtitle" class="modal-subtitle">Decoded on-chain clinical record</p>
         </div>
-        <button id="modal-close" class="modal-close-btn">&times;</button>
+        <button id="modal-close-btn" class="modal-close">&times;</button>
       </div>
       <div class="modal-body">
-        <div class="modal-meta-grid">
-          <div><strong style="color: var(--text-secondary);">Patient ID:</strong> <span id="modal-patient-id" style="font-weight: 600;">--</span></div>
-          <div><strong style="color: var(--text-secondary);">Clinical Code:</strong> <span id="modal-clinical-code" style="font-weight: 600;">--</span></div>
-          <div><strong style="color: var(--text-secondary);">Block Height:</strong> <span id="modal-block-num" style="font-weight: 600;">--</span></div>
-          <div><strong style="color: var(--text-secondary);">Origin Chain:</strong> <span id="modal-chain" style="font-weight: 600;">--</span></div>
-          <div style="grid-column: span 2;">
-            <strong style="color: var(--text-secondary);">Cryptographic Hash (SHA-256):</strong>
-            <code id="modal-hash" style="font-size: 11px; word-break: break-all; display: block; margin-top: 2px; color: var(--accent-gold);">--</code>
-          </div>
+        <div class="modal-meta-row">
+          <span id="modal-badge-resource" class="badge badge-resource">Observation</span>
+          <span id="modal-code" class="modal-code-tag">LOINC: 15074-8</span>
+          <span id="modal-chain" class="modal-chain-tag">Chain 11104</span>
+          <span id="modal-hash" class="modal-hash-tag">SHA-256 Verified</span>
         </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin: 12px 0 6px 0;">
-          <span style="font-size: 12px; color: var(--text-secondary);">Decoded HL7 FHIR Payload:</span>
-          <button id="modal-copy-btn" class="btn btn-sm btn-outline">📋 Copy JSON</button>
-        </div>
-        <pre id="modal-json-pre" class="code-block"></pre>
+        <pre><code id="modal-json-content" class="modal-code-block"></code></pre>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-copy-fhir" class="btn btn-outline">📋 Copy JSON</button>
+        <button id="btn-close-fhir-modal" class="btn btn-primary">Close</button>
       </div>
     </div>
   </div>

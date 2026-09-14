@@ -4,9 +4,14 @@ const path = require('path');
 const crypto = require('crypto');
 const { ethers } = require('ethers');
 const { ContractClient } = require('./contractClient');
-const { StoreForkEvent, BlockData } = require('../contracts/compiledArtifacts');
+const { ConsortiumGovernance, StoreForkEvent, BlockData } = require('../contracts/compiledArtifacts');
 const topology = require('../config/networkTopology.json');
 const { multiChainEngine } = require('../engine/chainEngine');
+
+let stakeholdersConfig = { personas: [], defaultStakeholders: {} };
+try {
+  stakeholdersConfig = require('../config/consortiumStakeholders.json');
+} catch (e) {}
 
 class ForkTreeService {
   constructor() {
@@ -83,153 +88,488 @@ class ForkTreeService {
 
   async getTreeTopology() {
     const deps = this.getDeployments();
-    const result = {
-      nodes: [],
-      edges: [],
-      adjacencyList: {},
-      totalForks: 0
-    };
+    if (!deps || !deps.repository || !deps.repository.address) {
+      return this._getFallbackTopology();
+    }
 
-    // If repository contract is deployed, query the actual on-chain topology
-    if (deps && deps.repository) {
-      try {
-        const repoClient = new ContractClient(
-          topology.repositoryChain.rpcUrl,
-          StoreForkEvent.abi,
-          deps.repository.address
-        );
+    try {
+      const repoClient = new ContractClient(
+        topology.repositoryChain.rpcUrl,
+        ConsortiumGovernance.abi,
+        deps.repository.address
+      );
 
-        const totalForksBn = await repoClient.call('totalForks');
-        result.totalForks = Number(totalForksBn);
+      const totalForks = await repoClient.call('totalForks');
+      const forkCount = Number(totalForks);
 
-        const forkDetails = await repoClient.call('getAllForkDetails');
+      if (forkCount === 0) {
+        return this._getFallbackTopology();
+      }
 
-        for (const chain of topology.chains) {
-          result.nodes.push({
-            id: chain.networkId.toString(),
-            name: chain.name,
-            port: chain.port,
-            isRoot: chain.isRoot,
-            parentNetworkId: chain.parentNetworkId.toString(),
-            forkBlockNumber: chain.forkBlockNumber
+      const allDetails = await repoClient.call('getAllForkDetails');
+
+      const nodes = [];
+      const edges = [];
+      const adjacency = {};
+
+      const rootChain = topology.chains.find(c => c.isRoot) || topology.chains[0];
+
+      for (const fork of allDetails) {
+        const netId = Number(fork.networkId || fork[0]);
+        const port = Number(fork.portNumber || fork[1]);
+        const parentNetId = Number(fork.parentNetworkId || fork[2]);
+        const forkBlock = Number(fork.parentChainForkBlockNumber || fork[3]);
+
+        const chainMeta = topology.chains.find(c => c.networkId === netId) || {
+          name: `Fork Chain ${netId}`,
+          isRoot: false
+        };
+
+        nodes.push({
+          networkId: netId,
+          port,
+          name: chainMeta.name,
+          isRoot: netId === rootChain.networkId,
+          parentNetworkId: parentNetId,
+          forkBlockNumber: forkBlock,
+          contractAddress: (deps.dataChains && deps.dataChains[netId]) ? deps.dataChains[netId].address : null
+        });
+
+        if (parentNetId !== topology.repositoryChain.networkId) {
+          edges.push({
+            from: parentNetId,
+            to: netId,
+            forkBlock
           });
 
-          const pKey = chain.parentNetworkId.toString();
-          const children = await repoClient.call('getAdjacencyList', [chain.parentNetworkId]);
-          result.adjacencyList[pKey] = Array.from(children).map(c => c.toString());
+          if (!adjacency[parentNetId]) adjacency[parentNetId] = [];
+          adjacency[parentNetId].push(netId);
         }
+      }
 
-        // Build edges
-        for (const detail of forkDetails) {
-          const netId = detail.networkId.toString();
-          const pId = detail.parentNetworkId.toString();
-          if (pId !== '11101') {
-            result.edges.push({
-              source: pId,
-              target: netId,
-              forkBlock: Number(detail.parentChainForkBlockNumber)
-            });
-          }
-        }
+      return {
+        rootNetworkId: rootChain.networkId,
+        nodes,
+        edges,
+        adjacency
+      };
+    } catch (err) {
+      console.warn('[ForkTreeService] Falling back to config topology due to error:', err.message);
+      return this._getFallbackTopology();
+    }
+  }
 
-        return result;
-      } catch (err) {
-        console.warn('Failed to fetch on-chain topology, falling back to static topology:', err.message);
+  _getFallbackTopology() {
+    const nodes = topology.chains.map(c => ({
+      networkId: c.networkId,
+      port: c.port,
+      name: c.name,
+      isRoot: !!c.isRoot,
+      parentNetworkId: c.parentNetworkId,
+      forkBlockNumber: c.forkBlockNumber
+    }));
+
+    const edges = [];
+    const adjacency = {};
+    const rootChain = topology.chains.find(c => c.isRoot) || topology.chains[0];
+
+    for (const c of topology.chains) {
+      if (c.parentNetworkId && c.parentNetworkId !== topology.repositoryChain.networkId) {
+        edges.push({
+          from: c.parentNetworkId,
+          to: c.networkId,
+          forkBlock: c.forkBlockNumber
+        });
+        if (!adjacency[c.parentNetworkId]) adjacency[c.parentNetworkId] = [];
+        adjacency[c.parentNetworkId].push(c.networkId);
       }
     }
 
-    // Fallback to static topology from config
-    for (const chain of topology.chains) {
-      result.nodes.push({
-        id: chain.networkId.toString(),
-        name: chain.name,
-        port: chain.port,
-        isRoot: chain.isRoot,
-        parentNetworkId: chain.parentNetworkId.toString(),
-        forkBlockNumber: chain.forkBlockNumber
-      });
+    return {
+      rootNetworkId: rootChain.networkId,
+      nodes,
+      edges,
+      adjacency
+    };
+  }
 
-      const pKey = chain.parentNetworkId.toString();
-      if (!result.adjacencyList[pKey]) {
-        result.adjacencyList[pKey] = [];
+  // --- Consortium Governance Methods ---
+  async getOrganizations() {
+    const deps = this.getDeployments();
+    if (!deps || !deps.repository || !deps.repository.address) {
+      return [];
+    }
+    try {
+      const repoClient = new ContractClient(
+        topology.repositoryChain.rpcUrl,
+        ConsortiumGovernance.abi,
+        deps.repository.address
+      );
+      const rawOrgs = await repoClient.call('getAllOrganizations');
+      const list = [];
+      for (const o of rawOrgs) {
+        list.push({
+          orgId: Number(o.orgId || o[0]),
+          name: String(o.name || o[1]),
+          adminAddress: String(o.adminAddress || o[2]),
+          networkId: Number(o.networkId || o[3]),
+          port: Number(o.port || o[4]),
+          orgType: String(o.orgType || o[5]),
+          active: Boolean(o.active !== undefined ? o.active : o[6]),
+          joinedAt: Number(o.joinedAt || o[7])
+        });
       }
-      result.adjacencyList[pKey].push(chain.networkId.toString());
+      return list;
+    } catch (e) {
+      console.warn('[ForkTreeService] Failed to fetch organizations:', e.message);
+      return [];
+    }
+  }
 
-      if (!chain.isRoot) {
-        result.edges.push({
-          source: chain.parentNetworkId.toString(),
-          target: chain.networkId.toString(),
-          forkBlock: chain.forkBlockNumber
+  async getProposals() {
+    const deps = this.getDeployments();
+    if (!deps || !deps.repository || !deps.repository.address) {
+      return [];
+    }
+    try {
+      const repoClient = new ContractClient(
+        topology.repositoryChain.rpcUrl,
+        ConsortiumGovernance.abi,
+        deps.repository.address
+      );
+      const rawProps = await repoClient.call('getAllProposals');
+      const list = [];
+      for (const p of rawProps) {
+        list.push({
+          proposalId: Number(p.proposalId || p[0]),
+          proposer: String(p.proposer || p[1]),
+          orgName: String(p.orgName || p[2]),
+          networkId: Number(p.networkId || p[3]),
+          portNumber: Number(p.portNumber || p[4]),
+          parentNetworkId: Number(p.parentNetworkId || p[5]),
+          parentChainForkBlockNumber: Number(p.parentChainForkBlockNumber || p[6]),
+          justification: String(p.justification || p[7]),
+          orgType: String(p.orgType || p[8]),
+          votesFor: Number(p.votesFor || p[9]),
+          votesAgainst: Number(p.votesAgainst || p[10]),
+          executed: Boolean(p.executed !== undefined ? p.executed : p[11]),
+          createdAt: Number(p.createdAt || p[12])
+        });
+      }
+      return list;
+    } catch (e) {
+      console.warn('[ForkTreeService] Failed to fetch proposals:', e.message);
+      return [];
+    }
+  }
+
+  async submitForkProposal(proposalData) {
+    const deps = this.getDeployments();
+    if (!deps || !deps.repository || !deps.repository.address) {
+      throw new Error('Repository contract not deployed');
+    }
+    const repoClient = new ContractClient(
+      topology.repositoryChain.rpcUrl,
+      ConsortiumGovernance.abi,
+      deps.repository.address
+    );
+
+    let parentNetId = Number(proposalData.parentNetworkId || 11102);
+    let forkBlock = Number(proposalData.forkBlockNumber);
+    if (isNaN(forkBlock) || forkBlock < 0) {
+      try {
+        const parentChain = topology.chains.find(c => c.networkId === parentNetId);
+        if (parentChain) {
+          const prov = new ethers.JsonRpcProvider(parentChain.rpcUrl);
+          const bNum = await prov.send('eth_blockNumber', []);
+          forkBlock = parseInt(bNum, 16);
+        } else {
+          forkBlock = 0;
+        }
+      } catch (e) {
+        forkBlock = 0;
+      }
+    }
+
+    let maxPort = 8551;
+    let maxNetId = 11107;
+    for (const c of topology.chains) {
+      if (c.port > maxPort) maxPort = c.port;
+      if (c.networkId > maxNetId) maxNetId = c.networkId;
+    }
+    const port = Number(proposalData.portNumber) || (maxPort + 1);
+    const netId = Number(proposalData.networkId) || (maxNetId + 1);
+    const proposer = proposalData.proposerAddress || '0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02';
+
+    const tx = await repoClient.send('proposeFork', [
+      proposalData.orgName || `Fork ${netId}`,
+      netId,
+      port,
+      parentNetId,
+      forkBlock,
+      proposalData.justification || 'Healthcare Specialty Branch Proposal',
+      proposalData.orgType || 'Specialty Clinic'
+    ], proposer);
+
+    return {
+      success: true,
+      txHash: tx.hash,
+      proposal: {
+        proposer,
+        orgName: proposalData.orgName,
+        networkId: netId,
+        portNumber: port,
+        parentNetworkId: parentNetId,
+        forkBlockNumber: forkBlock,
+        justification: proposalData.justification,
+        orgType: proposalData.orgType
+      }
+    };
+  }
+
+  async voteProposal({ voterAddress, proposalId, support = true }) {
+    const deps = this.getDeployments();
+    if (!deps || !deps.repository || !deps.repository.address) {
+      throw new Error('Repository contract not deployed');
+    }
+    const repoClient = new ContractClient(
+      topology.repositoryChain.rpcUrl,
+      ConsortiumGovernance.abi,
+      deps.repository.address
+    );
+    const voter = voterAddress || '0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02';
+    const tx = await repoClient.send('voteOnProposal', [
+      BigInt(proposalId),
+      Boolean(support)
+    ], voter);
+
+    return {
+      success: true,
+      proposalId: Number(proposalId),
+      voter,
+      support: Boolean(support),
+      txHash: tx.hash
+    };
+  }
+
+  async executeProposal({ executorAddress, proposalId, initialPatientRecords = [] }) {
+    const deps = this.getDeployments();
+    if (!deps || !deps.repository || !deps.repository.address) {
+      throw new Error('Repository contract not deployed');
+    }
+    const repoClient = new ContractClient(
+      topology.repositoryChain.rpcUrl,
+      ConsortiumGovernance.abi,
+      deps.repository.address
+    );
+
+    const proposals = await this.getProposals();
+    const target = proposals.find(p => p.proposalId === Number(proposalId));
+    if (!target) {
+      throw new Error(`Proposal ID ${proposalId} not found`);
+    }
+
+    const executor = executorAddress || '0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02';
+    const tx = await repoClient.send('executeForkProposal', [BigInt(proposalId)], executor);
+
+    // Spin up physical node
+    let spunNodeResult = null;
+    try {
+      spunNodeResult = await this.createForkChain({
+        name: target.orgName,
+        parentNetworkId: target.parentNetworkId,
+        forkBlockNumber: target.parentChainForkBlockNumber,
+        initialPatientRecords
+      });
+    } catch (e) {
+      console.warn('[ForkTreeService] Node creation:', e.message);
+    }
+
+    return {
+      success: true,
+      proposalId: Number(proposalId),
+      executed: true,
+      txHash: tx.hash,
+      nodeResult: spunNodeResult
+    };
+  }
+
+  // --- Stakeholder RBAC Management ---
+  async getStakeholders(port) {
+    const portNum = Number(port);
+    const chain = topology.chains.find(c => c.port === portNum);
+    if (!chain) return [];
+
+    const deps = this.getDeployments();
+    const chainDep = deps && deps.dataChains && deps.dataChains[chain.networkId];
+    if (!chainDep) return [];
+
+    const node = multiChainEngine.getNode(portNum);
+    const stakeholders = [];
+
+    const personas = (stakeholdersConfig && stakeholdersConfig.personas) || [];
+    for (const p of personas) {
+      if (p.port === portNum) {
+        stakeholders.push({
+          address: p.address,
+          name: p.name,
+          title: p.title,
+          role: p.role,
+          avatar: p.avatar
         });
       }
     }
 
-    result.totalForks = topology.chains.length;
-    return result;
+    if (node) {
+      for (const [_, contract] of node.contracts) {
+        if (contract.type === 'BlockData' && contract.state.stakeholders) {
+          for (const [sAddr, roleNum] of contract.state.stakeholders) {
+            const exists = stakeholders.find(s => s.address.toLowerCase() === sAddr.toLowerCase());
+            if (!exists) {
+              const rName = roleNum === 3 ? 'ADMIN' : roleNum === 1 ? 'CLINICIAN' : roleNum === 2 ? 'AUDITOR' : 'PATIENT';
+              stakeholders.push({
+                address: sAddr,
+                name: `Stakeholder ${sAddr.slice(0, 6)}`,
+                title: `${rName} Role`,
+                role: rName,
+                avatar: roleNum === 1 ? '🩺' : roleNum === 3 ? '🏥' : '👤'
+              });
+            }
+          }
+        }
+      }
+    }
+
+    return stakeholders;
+  }
+
+  async setStakeholderRole(port, ownerAddress, targetAddress, role = 1) {
+    const portNum = Number(port);
+    const chain = topology.chains.find(c => c.port === portNum);
+    if (!chain) throw new Error(`Chain on port ${port} not found`);
+
+    const deps = this.getDeployments();
+    const chainDep = deps && deps.dataChains && deps.dataChains[chain.networkId];
+    if (!chainDep) throw new Error(`Contract on port ${port} not deployed`);
+
+    const client = new ContractClient(chain.rpcUrl, BlockData.abi, chainDep.address);
+    const tx = await client.send('setStakeholderRole', [
+      targetAddress,
+      Number(role)
+    ], ownerAddress);
+
+    return {
+      success: true,
+      port: portNum,
+      targetAddress,
+      role: Number(role),
+      txHash: tx.hash
+    };
+  }
+
+  async addPatientRecord({ port, patientId, resourceType, clinicalCode, resourceData, callerAddress = null }) {
+    const portNum = Number(port);
+    const chain = topology.chains.find(c => c.port === portNum);
+    if (!chain) throw new Error(`Chain with port ${port} not found`);
+
+    const deps = this.getDeployments();
+    const chainDep = deps && deps.dataChains && deps.dataChains[chain.networkId];
+    if (!chainDep) throw new Error(`Contract for port ${port} not deployed`);
+
+    const client = new ContractClient(chain.rpcUrl, BlockData.abi, chainDep.address);
+    const jsonStr = typeof resourceData === 'string' ? resourceData : JSON.stringify(resourceData || {});
+    const dataHash = crypto.createHash('sha256').update(jsonStr).digest('hex');
+    const timestamp = Math.floor(Date.now() / 1000);
+
+    const fromAddr = callerAddress || '0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02';
+
+    const tx = await client.send('addPatientRecord', [
+      chain.networkId,
+      chain.port,
+      patientId,
+      resourceType,
+      clinicalCode,
+      jsonStr,
+      dataHash,
+      timestamp
+    ], fromAddr);
+
+    return {
+      success: true,
+      port: portNum,
+      networkId: chain.networkId,
+      patientId,
+      resourceType,
+      clinicalCode,
+      dataHash,
+      timestamp,
+      txHash: tx.hash,
+      callerAddress: fromAddr
+    };
   }
 
   async getChainDataPoints(port) {
+    const chain = topology.chains.find(c => c.port === Number(port));
+    if (!chain) return [];
+
     const deps = this.getDeployments();
-    const chainConfig = topology.chains.find(c => c.port === Number(port));
-    if (!chainConfig || !deps || !deps.dataChains || !deps.dataChains[chainConfig.networkId]) {
+    if (!deps || !deps.dataChains || !deps.dataChains[chain.networkId]) {
       return [];
     }
 
-    const contractInfo = deps.dataChains[chainConfig.networkId];
-    const client = new ContractClient(chainConfig.rpcUrl, BlockData.abi, contractInfo.address);
-
-    const points = await client.call('getAllDataPoints');
-    return points.map(p => ({
-      blockNumber: Number(p.blockNumber),
-      networkId: Number(p.networkId),
-      portNumber: Number(p.portNumber),
-      data: Number(p.data)
-    }));
-  }
-
-  async getAllDataPoints() {
-    const all = {};
-    for (const chain of topology.chains) {
-      try {
-        all[chain.port] = await this.getChainDataPoints(chain.port);
-      } catch (err) {
-        all[chain.port] = [];
-      }
+    try {
+      const client = new ContractClient(chain.rpcUrl, BlockData.abi, deps.dataChains[chain.networkId].address);
+      const points = await client.call('getAllDataPoints');
+      return Array.from(points).map(p => ({
+        blockNumber: Number(p.blockNumber || p[0]),
+        networkId: Number(p.networkId || p[1]),
+        portNumber: Number(p.portNumber || p[2]),
+        data: Number(p.data || p[3])
+      }));
+    } catch (e) {
+      console.warn(`[ForkTreeService] Could not fetch data points from :${port}:`, e.message);
+      return [];
     }
-    return all;
   }
 
   async getChainPatientRecords(port) {
+    const chain = topology.chains.find(c => c.port === Number(port));
+    if (!chain) return [];
+
     const deps = this.getDeployments();
-    const chainConfig = topology.chains.find(c => c.port === Number(port));
-    if (!chainConfig || !deps || !deps.dataChains || !deps.dataChains[chainConfig.networkId]) {
+    if (!deps || !deps.dataChains || !deps.dataChains[chain.networkId]) {
       return [];
     }
 
-    const contractInfo = deps.dataChains[chainConfig.networkId];
-    const client = new ContractClient(chainConfig.rpcUrl, BlockData.abi, contractInfo.address);
+    try {
+      const client = new ContractClient(chain.rpcUrl, BlockData.abi, deps.dataChains[chain.networkId].address);
+      const records = await client.call('getAllRecords');
+      return Array.from(records).map(r => {
+        let parsedData = r.resourceData || r[6];
+        try { parsedData = JSON.parse(parsedData); } catch (e) {}
 
-    const records = await client.call('getAllRecords');
-    return records.map(r => {
-      let parsedData = r.resourceData;
-      try {
-        parsedData = JSON.parse(r.resourceData);
-      } catch (e) {}
+        const tsSec = Number(r.timestamp || r[8]);
+        const isoTime = tsSec ? new Date(tsSec * 1000).toISOString() : new Date().toISOString();
 
-      return {
-        blockNumber: Number(r.blockNumber),
-        networkId: Number(r.networkId),
-        portNumber: Number(r.portNumber),
-        patientId: r.patientId,
-        resourceType: r.resourceType,
-        clinicalCode: r.clinicalCode,
-        resourceData: parsedData,
-        rawResourceData: r.resourceData,
-        dataHash: r.dataHash,
-        timestamp: Number(r.timestamp),
-        timestampIso: new Date(Number(r.timestamp) * 1000).toISOString()
-      };
-    });
+        return {
+          blockNumber: Number(r.blockNumber || r[0]),
+          networkId: Number(r.networkId || r[1]),
+          portNumber: Number(r.portNumber || r[2]),
+          chainName: chain.name,
+          patientId: String(r.patientId || r[3]),
+          resourceType: String(r.resourceType || r[4]),
+          clinicalCode: String(r.clinicalCode || r[5]),
+          resourceData: parsedData,
+          rawResourceData: String(r.resourceData || r[6]),
+          dataHash: String(r.dataHash || r[7]),
+          timestamp: tsSec,
+          timestampIso: isoTime
+        };
+      });
+    } catch (e) {
+      console.warn(`[ForkTreeService] Could not fetch patient records from :${port}:`, e.message);
+      return [];
+    }
   }
 
   async getAllPatientRecords() {
@@ -278,7 +618,7 @@ class ForkTreeService {
       if (visited.has(currentNetId)) return;
       visited.add(currentNetId);
 
-      const chainConfig = topology.chains.find(c => c.networkId.toString() === currentNetId);
+      const chainConfig = topology.chains.find(c => c.networkId.toString() === currentNetId.toString());
       if (!chainConfig) return;
 
       const pathEntry = {
@@ -292,7 +632,6 @@ class ForkTreeService {
       };
       traversalPath.push(pathEntry);
 
-      // Query chain contract for matching data
       if (deps && deps.dataChains && deps.dataChains[chainConfig.networkId]) {
         try {
           const client = new ContractClient(
@@ -302,7 +641,6 @@ class ForkTreeService {
           );
 
           let matchingBlocks = [];
-          let matchingRecords = [];
 
           if (resolvedType === 'integer') {
             const res = await client.call('searchMatchingDataPointsBlockNumbers', [BigInt(searchValue)]);
@@ -329,16 +667,15 @@ class ForkTreeService {
                     networkId: Number(r.networkId),
                     portNumber: Number(r.portNumber),
                     chainName: chainConfig.name,
-                    patientId: r.patientId,
-                    resourceType: r.resourceType,
-                    clinicalCode: r.clinicalCode,
+                    patientId: String(r.patientId),
+                    resourceType: String(r.resourceType),
+                    clinicalCode: String(r.clinicalCode),
                     resourceData: parsedData,
-                    rawResourceData: r.resourceData,
-                    dataHash: r.dataHash,
+                    rawResourceData: String(r.resourceData),
+                    dataHash: String(r.dataHash),
                     timestamp: Number(r.timestamp),
                     timestampIso: new Date(Number(r.timestamp) * 1000).toISOString()
                   };
-                  matchingRecords.push(recObj);
                   longitudinalRecord.push(recObj);
                 }
               }
@@ -349,23 +686,19 @@ class ForkTreeService {
             matches.push({
               networkId: chainConfig.networkId,
               port: chainConfig.port,
-              name: chainConfig.name,
-              level: depth,
-              depth,
+              chainName: chainConfig.name,
               matchingBlocks,
-              matchingRecords,
-              searchValue: resolvedType === 'integer' ? Number(searchValue) : String(searchValue),
+              found: true,
               queryType: resolvedType
             });
-            pathEntry.foundMatch = true;
+            pathEntry.found = true;
           }
         } catch (err) {
-          console.error(`Error querying chain ${chainConfig.port} during DFS:`, err.message);
+          console.warn(`[ForkTreeService] Error querying chain ${chainConfig.port}:`, err.message);
         }
       }
 
-      // Recurse to children in adjacency list
-      const children = treeTopology.adjacencyList[currentNetId] || [];
+      const children = treeTopology.adjacency[currentNetId] || [];
       for (const childNetId of children) {
         await dfs(childNetId, depth + 1);
       }
@@ -399,14 +732,15 @@ class ForkTreeService {
     const matches = [];
     const longitudinalRecord = [];
     const visited = new Set();
-    const queue = [{ id: startNetworkId.toString(), level: 0 }];
+    const queue = [{ netId: startNetworkId.toString(), level: 0 }];
 
     while (queue.length > 0) {
-      const { id: currentNetId, level } = queue.shift();
-      if (visited.has(currentNetId)) continue;
-      visited.add(currentNetId);
+      const { netId, level } = queue.shift();
 
-      const chainConfig = topology.chains.find(c => c.networkId.toString() === currentNetId);
+      if (visited.has(netId)) continue;
+      visited.add(netId);
+
+      const chainConfig = topology.chains.find(c => c.networkId.toString() === netId.toString());
       if (!chainConfig) continue;
 
       const pathEntry = {
@@ -414,12 +748,12 @@ class ForkTreeService {
         port: chainConfig.port,
         name: chainConfig.name,
         level,
+        depth: level,
         step: traversalPath.length + 1,
         timestamp: new Date().toISOString()
       };
       traversalPath.push(pathEntry);
 
-      // Query chain contract for matching data
       if (deps && deps.dataChains && deps.dataChains[chainConfig.networkId]) {
         try {
           const client = new ContractClient(
@@ -429,7 +763,6 @@ class ForkTreeService {
           );
 
           let matchingBlocks = [];
-          let matchingRecords = [];
 
           if (resolvedType === 'integer') {
             const res = await client.call('searchMatchingDataPointsBlockNumbers', [BigInt(searchValue)]);
@@ -456,16 +789,15 @@ class ForkTreeService {
                     networkId: Number(r.networkId),
                     portNumber: Number(r.portNumber),
                     chainName: chainConfig.name,
-                    patientId: r.patientId,
-                    resourceType: r.resourceType,
-                    clinicalCode: r.clinicalCode,
+                    patientId: String(r.patientId),
+                    resourceType: String(r.resourceType),
+                    clinicalCode: String(r.clinicalCode),
                     resourceData: parsedData,
-                    rawResourceData: r.resourceData,
-                    dataHash: r.dataHash,
+                    rawResourceData: String(r.resourceData),
+                    dataHash: String(r.dataHash),
                     timestamp: Number(r.timestamp),
                     timestampIso: new Date(Number(r.timestamp) * 1000).toISOString()
                   };
-                  matchingRecords.push(recObj);
                   longitudinalRecord.push(recObj);
                 }
               }
@@ -476,25 +808,22 @@ class ForkTreeService {
             matches.push({
               networkId: chainConfig.networkId,
               port: chainConfig.port,
-              name: chainConfig.name,
-              level,
+              chainName: chainConfig.name,
               matchingBlocks,
-              matchingRecords,
-              searchValue: resolvedType === 'integer' ? Number(searchValue) : String(searchValue),
+              found: true,
               queryType: resolvedType
             });
-            pathEntry.foundMatch = true;
+            pathEntry.found = true;
           }
         } catch (err) {
-          console.error(`Error querying chain ${chainConfig.port} during BFS:`, err.message);
+          console.warn(`[ForkTreeService] Error querying chain ${chainConfig.port}:`, err.message);
         }
       }
 
-      // Enqueue child nodes
-      const children = treeTopology.adjacencyList[currentNetId] || [];
+      const children = treeTopology.adjacency[netId] || [];
       for (const childNetId of children) {
-        if (!visited.has(childNetId)) {
-          queue.push({ id: childNetId, level: level + 1 });
+        if (!visited.has(childNetId.toString())) {
+          queue.push({ netId: childNetId.toString(), level: level + 1 });
         }
       }
     }
@@ -557,7 +886,6 @@ class ForkTreeService {
       throw new Error(`Parent chain with Network ID ${parentNetworkId} not found`);
     }
 
-    // Determine fork block number (default to parent's current block height)
     let finalForkBlock = Number(forkBlockNumber);
     if (isNaN(finalForkBlock) || finalForkBlock < 0) {
       try {
@@ -607,7 +935,7 @@ class ForkTreeService {
       try {
         const repoClient = new ContractClient(
           topology.repositoryChain.rpcUrl,
-          StoreForkEvent.abi,
+          ConsortiumGovernance.abi,
           deployments.repository.address
         );
         await repoClient.send('addForkDetail', [

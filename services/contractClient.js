@@ -28,10 +28,10 @@ class ContractClient {
     return receipt.contractAddress;
   }
 
-  async send(methodName, args = []) {
+  async send(methodName, args = [], fromAddress = null) {
     if (!this.address) throw new Error('Contract address not set for send()');
     const accounts = await this.provider.send('eth_accounts', []);
-    const from = accounts && accounts.length > 0 ? accounts[0] : '0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02';
+    const from = fromAddress || (accounts && accounts.length > 0 ? accounts[0] : '0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02');
 
     const data = this.iface.encodeFunctionData(methodName, args);
     const txHash = await this.provider.send('eth_sendTransaction', [{

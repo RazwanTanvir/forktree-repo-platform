@@ -1,6 +1,23 @@
-// Frontend client logic for BlockchainForkTree Dashboard
+// Frontend client logic for BlockchainForkTree Shared Governance & EHR Platform
 document.addEventListener('DOMContentLoaded', () => {
-  // Navigation Tabs
+  // Active Persona State
+  let currentPersona = {
+    id: 'metro-clinician',
+    name: 'Dr. Alice Smith',
+    title: 'Senior Attending Physician',
+    address: '0x2222222222222222222222222222222222222222',
+    organizationId: 11103,
+    organizationName: 'Metro General Hospital',
+    role: 'CLINICIAN',
+    port: 8547,
+    permissions: ['WRITE_RECORDS', 'READ_RECORDS', 'QUERY_EHR'],
+    avatar: '🩺'
+  };
+
+  let cachedPersonas = [];
+  let cachedChains = [];
+
+  // --- Navigation Tabs ---
   const tabButtons = document.querySelectorAll('.tab-btn');
   const tabContents = document.querySelectorAll('.tab-content');
 
@@ -15,879 +32,1049 @@ document.addEventListener('DOMContentLoaded', () => {
       if (content) content.classList.add('active');
 
       if (targetTab === 'tree') loadTreeTopology();
+      if (targetTab === 'governance') {
+        loadGovernanceOrganizations();
+        loadGovernanceProposals();
+        populateProposalParentDropdown();
+      }
       if (targetTab === 'nodes') loadNodesStatus();
-      if (targetTab === 'data') loadChainData();
-      if (targetTab === 'create-fork') populateChainDropdowns();
+      if (targetTab === 'data') {
+        loadChainData();
+        populateDataChainSelect();
+      }
+      if (targetTab === 'create-fork') populateForkParentSelect();
     });
   });
 
-  // Global Actions
-  const btnReseed = document.getElementById('btn-reseed');
-  if (btnReseed) {
-    btnReseed.addEventListener('click', async () => {
-      btnReseed.disabled = true;
-      btnReseed.textContent = '↺ Resetting & Reseeding...';
-      try {
-        const res = await fetch('/api/reset-and-seed', { method: 'POST' });
-        const json = await res.json();
-        alert(json.message || 'Reset complete!');
-        loadNodesStatus();
-        loadTreeTopology();
-        loadChainData();
-      } catch (err) {
-        alert('Reset failed: ' + err.message);
-      } finally {
-        btnReseed.disabled = false;
-        btnReseed.textContent = '↺ Reset & Reseed';
+  // --- Persona Switcher Setup ---
+  async function initPersonas() {
+    try {
+      const res = await fetch('/api/personas');
+      const json = await res.json();
+      if (json.success && Array.isArray(json.personas)) {
+        cachedPersonas = json.personas;
+        const select = document.getElementById('persona-select');
+        if (select) {
+          select.innerHTML = '';
+          cachedPersonas.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = `${p.avatar} ${p.name} (${p.title} - ${p.organizationName})`;
+            select.appendChild(opt);
+          });
+          select.value = currentPersona.id;
+          select.addEventListener('change', () => {
+            const chosen = cachedPersonas.find(p => p.id === select.value);
+            if (chosen) {
+              currentPersona = chosen;
+              updatePersonaUI();
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Could not load personas:', e.message);
+    }
+    updatePersonaUI();
+  }
+
+  function updatePersonaUI() {
+    const avatarEl = document.getElementById('persona-avatar');
+    const badgeEl = document.getElementById('persona-badge');
+    const orgEl = document.getElementById('persona-org');
+    const addrEl = document.getElementById('persona-address');
+    const propProposerEl = document.getElementById('prop-current-proposer');
+
+    if (avatarEl) avatarEl.textContent = currentPersona.avatar || '👤';
+    if (badgeEl) {
+      badgeEl.textContent = currentPersona.role;
+      badgeEl.className = `badge badge-role role-${currentPersona.role.toLowerCase()}`;
+    }
+    if (orgEl) orgEl.textContent = `${currentPersona.organizationName} (:${currentPersona.port})`;
+    if (addrEl) addrEl.textContent = `${currentPersona.address.slice(0, 6)}...${currentPersona.address.slice(-4)}`;
+    if (propProposerEl) propProposerEl.textContent = currentPersona.address;
+
+    updateAuthStatusBanner();
+    checkChainAuthorization();
+  }
+
+  function updateAuthStatusBanner() {
+    const banner = document.getElementById('auth-status-banner');
+    const title = document.getElementById('auth-status-title');
+    const desc = document.getElementById('auth-status-desc');
+    const targetChainSelect = document.getElementById('patient-chain-select');
+    const targetPort = targetChainSelect ? parseInt(targetChainSelect.value, 10) : currentPersona.port;
+
+    if (!banner || !title || !desc) return;
+
+    const isAuthorized = (currentPersona.port === targetPort && (currentPersona.role === 'CLINICIAN' || currentPersona.role === 'ADMIN')) || currentPersona.address === '0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02';
+
+    if (isAuthorized) {
+      banner.className = 'auth-banner auth-allowed';
+      title.textContent = `✓ Authorized Clinician / Stakeholder`;
+      desc.textContent = `You are authenticated as ${currentPersona.name} (${currentPersona.title}) with write authorization on Port ${targetPort}.`;
+    } else {
+      banner.className = 'auth-banner auth-restricted';
+      title.textContent = `⚠️ Restricted Access / Read-Only`;
+      desc.textContent = `Operating as ${currentPersona.name} (${currentPersona.role} at ${currentPersona.organizationName}). You do not have clinician write authorization on Port ${targetPort}. Transactions will revert unless granted stakeholder role by the organization owner.`;
+    }
+  }
+
+  function checkChainAuthorization() {
+    const targetChainSelect = document.getElementById('patient-chain-select');
+    const hint = document.getElementById('chain-auth-hint');
+    const permBadge = document.getElementById('write-perm-badge');
+    const commitBtn = document.getElementById('btn-commit-record');
+
+    if (!targetChainSelect) return;
+    const targetPort = parseInt(targetChainSelect.value, 10);
+    const isAuthorized = (currentPersona.port === targetPort && (currentPersona.role === 'CLINICIAN' || currentPersona.role === 'ADMIN')) || currentPersona.address === '0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02';
+
+    if (isAuthorized) {
+      if (hint) {
+        hint.textContent = `✓ Active persona is an authorized writer on this blockchain (: ${targetPort}).`;
+        hint.style.color = '#7ee787';
+      }
+      if (permBadge) {
+        permBadge.textContent = '🔓 Authorized Clinician';
+        permBadge.className = 'badge badge-success';
+      }
+      if (commitBtn) {
+        commitBtn.disabled = false;
+        commitBtn.textContent = '🔒 Commit Record with Clinician Credentials';
+      }
+    } else {
+      if (hint) {
+        hint.textContent = `⚠️ Active persona (${currentPersona.name}) is not a registered clinician for Port ${targetPort}.`;
+        hint.style.color = '#f85149';
+      }
+      if (permBadge) {
+        permBadge.textContent = '🔒 Unauthorized (Revert on commit)';
+        permBadge.className = 'badge badge-danger';
+      }
+      if (commitBtn) {
+        commitBtn.disabled = false;
+        commitBtn.textContent = '⚠️ Attempt Commit (Will Test RBAC Reversion)';
+      }
+    }
+  }
+
+  // --- Fetch Active Chains Helper ---
+  async function fetchChains() {
+    try {
+      const res = await fetch('/api/chains');
+      const json = await res.json();
+      if (json.success && Array.isArray(json.chains)) {
+        cachedChains = json.chains;
+      }
+    } catch (e) {
+      console.warn('Could not fetch chains:', e.message);
+    }
+    return cachedChains;
+  }
+
+  async function populateDataChainSelect() {
+    const select = document.getElementById('patient-chain-select');
+    const filter = document.getElementById('data-chain-filter');
+    if (!select) return;
+
+    const chains = await fetchChains();
+    const currentVal = select.value;
+    select.innerHTML = '';
+    chains.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.port;
+      opt.textContent = `${c.name} (Port ${c.port} | Net ${c.networkId})`;
+      select.appendChild(opt);
+    });
+
+    if (currentVal && chains.some(c => c.port === Number(currentVal))) {
+      select.value = currentVal;
+    } else if (chains.some(c => c.port === currentPersona.port)) {
+      select.value = currentPersona.port;
+    }
+
+    if (filter && filter.options.length <= 1) {
+      chains.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.port;
+        opt.textContent = `${c.name} (Port ${c.port})`;
+        filter.appendChild(opt);
+      });
+    }
+
+    select.removeEventListener('change', onDataChainSelectChange);
+    select.addEventListener('change', onDataChainSelectChange);
+    checkChainAuthorization();
+  }
+
+  function onDataChainSelectChange() {
+    updateAuthStatusBanner();
+    checkChainAuthorization();
+  }
+
+  async function populateProposalParentDropdown() {
+    const select = document.getElementById('prop-parent-chain');
+    if (!select) return;
+    const chains = await fetchChains();
+    select.innerHTML = '';
+    chains.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.networkId;
+      opt.textContent = `${c.name} (Net ${c.networkId} | Port ${c.port})`;
+      select.appendChild(opt);
+    });
+  }
+
+  async function populateForkParentSelect() {
+    const select = document.getElementById('fork-parent-select');
+    if (!select) return;
+    const chains = await fetchChains();
+    select.innerHTML = '';
+    chains.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.networkId;
+      opt.textContent = `${c.name} (Net ${c.networkId} | Port ${c.port} | Block #${c.blockNumber})`;
+      select.appendChild(opt);
+    });
+  }
+
+  // --- TAB 1: Tree Topology SVG Rendering ---
+  async function loadTreeTopology() {
+    const svg = document.getElementById('tree-svg');
+    if (!svg) return;
+
+    try {
+      const res = await fetch('/api/tree');
+      const json = await res.json();
+      if (!json.success || !json.tree) return;
+
+      const { nodes, edges } = json.tree;
+      renderTreeSvg(svg, nodes, edges);
+    } catch (e) {
+      console.warn('Failed to load tree topology:', e.message);
+    }
+  }
+
+  function renderTreeSvg(svg, nodes, edges) {
+    svg.innerHTML = '';
+    if (!nodes || nodes.length === 0) return;
+
+    const width = svg.clientWidth || 600;
+    const height = svg.clientHeight || 450;
+
+    // Calculate hierarchical levels using parent links
+    const levelMap = new Map();
+    const childrenMap = new Map();
+
+    nodes.forEach(n => {
+      childrenMap.set(n.networkId, []);
+    });
+
+    edges.forEach(e => {
+      if (childrenMap.has(e.from)) {
+        childrenMap.get(e.from).push(e.to);
       }
     });
-  }
 
-  const btnRefreshNodes = document.getElementById('btn-refresh-nodes');
-  if (btnRefreshNodes) {
-    btnRefreshNodes.addEventListener('click', loadNodesStatus);
-  }
+    const rootNode = nodes.find(n => n.isRoot) || nodes[0];
+    levelMap.set(rootNode.networkId, 0);
 
-  // Chain Data Filter
-  const chainFilter = document.getElementById('chain-filter');
-  if (chainFilter) {
-    chainFilter.addEventListener('change', () => {
-      loadChainData(chainFilter.value);
+    const queue = [rootNode.networkId];
+    while (queue.length > 0) {
+      const current = queue.shift();
+      const currentLevel = levelMap.get(current);
+      const kids = childrenMap.get(current) || [];
+      kids.forEach(kid => {
+        if (!levelMap.has(kid)) {
+          levelMap.set(kid, currentLevel + 1);
+          queue.push(kid);
+        }
+      });
+    }
+
+    const maxLevel = Math.max(...Array.from(levelMap.values()), 1);
+    const levelCounts = {};
+    levelMap.forEach(lvl => {
+      levelCounts[lvl] = (levelCounts[lvl] || 0) + 1;
+    });
+
+    const levelCurrentIdx = {};
+    const coords = new Map();
+
+    nodes.forEach(n => {
+      const lvl = levelMap.get(n.networkId) || 0;
+      const totalInLvl = levelCounts[lvl] || 1;
+      const idx = levelCurrentIdx[lvl] || 0;
+      levelCurrentIdx[lvl] = idx + 1;
+
+      const y = 60 + (lvl * ((height - 120) / maxLevel));
+      const x = (width / (totalInLvl + 1)) * (idx + 1);
+
+      coords.set(n.networkId, { x, y });
+    });
+
+    // Render edges
+    edges.forEach(e => {
+      const p1 = coords.get(e.from);
+      const p2 = coords.get(e.to);
+      if (p1 && p2) {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        const midY = (p1.y + p2.y) / 2;
+        const d = `M ${p1.x} ${p1.y} C ${p1.x} ${midY}, ${p2.x} ${midY}, ${p2.x} ${p2.y}`;
+        path.setAttribute('d', d);
+        path.setAttribute('stroke', 'rgba(56, 139, 253, 0.45)');
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('fill', 'none');
+        svg.appendChild(path);
+
+        // Edge label (fork block)
+        if (e.forkBlock !== undefined) {
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', (p1.x + p2.x) / 2 + 10);
+          text.setAttribute('y', midY);
+          text.setAttribute('fill', '#e3b341');
+          text.setAttribute('font-size', '10');
+          text.setAttribute('font-family', 'var(--font-mono)');
+          text.textContent = `@Block ${e.forkBlock}`;
+          svg.appendChild(text);
+        }
+      }
+    });
+
+    // Render nodes
+    nodes.forEach(n => {
+      const p = coords.get(n.networkId);
+      if (!p) return;
+
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.setAttribute('cursor', 'pointer');
+
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', p.x);
+      circle.setAttribute('cy', p.y);
+      circle.setAttribute('r', n.isRoot ? '24' : '20');
+      circle.setAttribute('fill', n.isRoot ? '#1f6feb' : '#238636');
+      circle.setAttribute('stroke', '#f0f6fc');
+      circle.setAttribute('stroke-width', '2');
+      g.appendChild(circle);
+
+      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      label.setAttribute('x', p.x);
+      label.setAttribute('y', p.y + 36);
+      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('fill', '#f0f6fc');
+      label.setAttribute('font-size', '11');
+      label.setAttribute('font-weight', '600');
+      label.textContent = n.name.split(' (')[0];
+      g.appendChild(label);
+
+      const sub = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      sub.setAttribute('x', p.x);
+      sub.setAttribute('y', p.y + 48);
+      sub.setAttribute('text-anchor', 'middle');
+      sub.setAttribute('fill', 'var(--text-secondary)');
+      sub.setAttribute('font-size', '9');
+      sub.setAttribute('font-family', 'var(--font-mono)');
+      sub.textContent = `:${n.port} | Net ${n.networkId}`;
+      g.appendChild(sub);
+
+      svg.appendChild(g);
     });
   }
 
-  // Add Data Form (HL7 Patient Health Record)
-  const formAddData = document.getElementById('form-add-data');
-  if (formAddData) {
-    formAddData.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const port = document.getElementById('add-target-port').value;
-      const patientId = document.getElementById('add-patient-id').value.trim();
-      const resourceType = document.getElementById('add-resource-type').value;
-      const clinicalCode = document.getElementById('add-clinical-code').value.trim();
-      const resourceDataStr = document.getElementById('add-resource-data').value.trim();
-      const statusDiv = document.getElementById('add-data-status');
+  // --- TAB 2: Shared Governance Dashboard ---
+  async function loadGovernanceOrganizations() {
+    const tbody = document.getElementById('governance-orgs-tbody');
+    const countBadge = document.getElementById('org-count-badge');
+    if (!tbody) return;
 
-      statusDiv.className = 'alert-msg';
-      statusDiv.style.display = 'block';
-      statusDiv.textContent = 'Submitting transaction to blockchain...';
-
-      let parsedData = resourceDataStr;
-      try {
-        parsedData = JSON.parse(resourceDataStr);
-      } catch (err) {
-        statusDiv.className = 'alert-msg show-error';
-        statusDiv.textContent = `Invalid JSON format: ${err.message}`;
+    try {
+      const res = await fetch('/api/governance/organizations');
+      const json = await res.json();
+      if (!json.success || !Array.isArray(json.organizations)) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No organizations registered yet.</td></tr>';
         return;
       }
+
+      const orgs = json.organizations;
+      if (countBadge) countBadge.textContent = `${orgs.length} Organizations`;
+
+      tbody.innerHTML = '';
+      orgs.forEach(o => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>#${o.orgId}</strong></td>
+          <td><strong>${o.name}</strong></td>
+          <td><span class="badge badge-info">${o.orgType || 'Healthcare Org'}</span></td>
+          <td><code>${o.networkId}</code></td>
+          <td><code>:${o.port}</code></td>
+          <td title="${o.adminAddress}"><code class="mono-code">${o.adminAddress.slice(0, 6)}...${o.adminAddress.slice(-4)}</code></td>
+          <td><span class="badge badge-success">✓ Active Member</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="7" class="alert-msg show-error">Failed to load organizations: ${e.message}</td></tr>`;
+    }
+  }
+
+  async function loadGovernanceProposals() {
+    const container = document.getElementById('proposals-list-container');
+    if (!container) return;
+
+    try {
+      const res = await fetch('/api/governance/proposals');
+      const json = await res.json();
+      if (!json.success || !Array.isArray(json.proposals) || json.proposals.length === 0) {
+        container.innerHTML = '<div class="empty-state">No governance proposals submitted yet. Use the form above to propose a new organizational fork.</div>';
+        return;
+      }
+
+      const proposals = json.proposals;
+      container.innerHTML = '';
+
+      proposals.forEach(p => {
+        const totalVotes = p.votesFor + p.votesAgainst;
+        const pctFor = totalVotes > 0 ? Math.round((p.votesFor / totalVotes) * 100) : 50;
+        const card = document.createElement('div');
+        card.className = `proposal-card ${p.executed ? 'executed' : ''}`;
+
+        const isMember = currentPersona.role === 'ADMIN';
+
+        card.innerHTML = `
+          <div class="proposal-header">
+            <div>
+              <div class="proposal-title">#${p.proposalId}: ${p.orgName}</div>
+              <div class="proposal-meta">
+                <span>Proposed by: <code class="mono-code">${p.proposer.slice(0, 6)}...${p.proposer.slice(-4)}</code></span> | 
+                <span>Fork from: <strong>Chain ${p.parentNetworkId}</strong></span> |
+                <span>Type: <strong>${p.orgType}</strong></span>
+              </div>
+            </div>
+            <span class="badge ${p.executed ? 'badge-success' : 'badge-primary'}">
+              ${p.executed ? '✓ Executed & Spun Up' : 'Voting Open'}
+            </span>
+          </div>
+
+          <div class="proposal-justification">
+            <strong>Clinical Justification:</strong> ${p.justification}
+          </div>
+
+          <div class="vote-stats-container">
+            <div class="vote-stats-numbers">
+              <span class="vote-stat-for">👍 ${p.votesFor} For (${pctFor}%)</span>
+              <span class="vote-stat-against">👎 ${p.votesAgainst} Against</span>
+            </div>
+            <div class="vote-progress-track">
+              <div class="vote-progress-fill" style="width: ${pctFor}%;"></div>
+            </div>
+          </div>
+
+          ${p.executed ? `
+            <div class="badge badge-success text-center py-1">
+              Active in Tree Lineage (Net ${p.networkId} | Port ${p.portNumber})
+            </div>
+          ` : `
+            <div class="proposal-actions-row">
+              <button class="btn-vote-for" data-id="${p.proposalId}" ${!isMember ? 'disabled title="Only member admins can vote"' : ''}>
+                👍 Vote FOR
+              </button>
+              <button class="btn-vote-against" data-id="${p.proposalId}" ${!isMember ? 'disabled title="Only member admins can vote"' : ''}>
+                👎 Vote AGAINST
+              </button>
+              ${p.votesFor > p.votesAgainst ? `
+                <button class="btn-execute-proposal" data-id="${p.proposalId}">
+                  🚀 Execute & Spin Up Node
+                </button>
+              ` : ''}
+            </div>
+          `}
+        `;
+
+        container.appendChild(card);
+      });
+
+      // Wire up voting buttons
+      container.querySelectorAll('.btn-vote-for').forEach(btn => {
+        btn.addEventListener('click', () => castVote(btn.dataset.id, true));
+      });
+      container.querySelectorAll('.btn-vote-against').forEach(btn => {
+        btn.addEventListener('click', () => castVote(btn.dataset.id, false));
+      });
+      container.querySelectorAll('.btn-execute-proposal').forEach(btn => {
+        btn.addEventListener('click', () => executeProposal(btn.dataset.id));
+      });
+    } catch (e) {
+      container.innerHTML = `<div class="alert-msg show-error">Failed to load proposals: ${e.message}</div>`;
+    }
+  }
+
+  async function castVote(proposalId, support) {
+    try {
+      const res = await fetch('/api/governance/vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          proposalId: Number(proposalId),
+          support: Boolean(support),
+          voterAddress: currentPersona.address
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        alert(`✓ Vote recorded as ${currentPersona.name} (${support ? 'FOR' : 'AGAINST'})`);
+        loadGovernanceProposals();
+      } else {
+        alert(`Voting error: ${json.error}`);
+      }
+    } catch (e) {
+      alert(`Network error: ${e.message}`);
+    }
+  }
+
+  async function executeProposal(proposalId) {
+    if (!confirm(`Execute Proposal #${proposalId} and spin up the new forked blockchain node?`)) return;
+
+    try {
+      const res = await fetch('/api/governance/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          proposalId: Number(proposalId),
+          executorAddress: currentPersona.address
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        alert(`✓ Proposal executed! Node spun up and integrated into consortium tree.`);
+        loadGovernanceProposals();
+        loadGovernanceOrganizations();
+        loadTreeTopology();
+      } else {
+        alert(`Execution error: ${json.error}`);
+      }
+    } catch (e) {
+      alert(`Network error: ${e.message}`);
+    }
+  }
+
+  // Proposal Submission Form
+  const formProposal = document.getElementById('form-submit-proposal');
+  if (formProposal) {
+    formProposal.addEventListener('submit', async e => {
+      e.preventDefault();
+      const orgName = document.getElementById('prop-org-name').value.trim();
+      const parentNetworkId = Number(document.getElementById('prop-parent-chain').value);
+      const orgType = document.getElementById('prop-org-type').value;
+      const justification = document.getElementById('prop-justification').value.trim();
+
+      const btn = document.getElementById('btn-submit-proposal');
+      btn.disabled = true;
+      btn.textContent = 'Submitting on-chain...';
+
+      try {
+        const res = await fetch('/api/governance/proposals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orgName,
+            parentNetworkId,
+            orgType,
+            justification,
+            proposerAddress: currentPersona.address
+          })
+        });
+        const json = await res.json();
+        if (json.success) {
+          alert(`✓ Proposal submitted successfully to Consortium Governance! Proposal ID: #${json.proposal ? json.proposal.networkId : ''}`);
+          formProposal.reset();
+          loadGovernanceProposals();
+        } else {
+          alert(`Submission failed: ${json.error}`);
+        }
+      } catch (e) {
+        alert(`Network error: ${e.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '📜 Submit Proposal to Consortium';
+      }
+    });
+  }
+
+  const btnRefreshProposals = document.getElementById('btn-refresh-proposals');
+  if (btnRefreshProposals) {
+    btnRefreshProposals.addEventListener('click', loadGovernanceProposals);
+  }
+
+  // --- TAB 3: Nodes Status ---
+  async function loadNodesStatus() {
+    const grid = document.getElementById('nodes-grid');
+    if (!grid) return;
+
+    try {
+      const res = await fetch('/api/status');
+      const json = await res.json();
+      if (!json.success || !Array.isArray(json.nodes)) return;
+
+      grid.innerHTML = '';
+      json.nodes.forEach(node => {
+        const card = document.createElement('div');
+        card.className = 'node-card';
+        card.innerHTML = `
+          <div class="node-header">
+            <div>
+              <div class="node-title">${node.name}</div>
+              <div class="node-sub">Network ID: ${node.networkId}</div>
+            </div>
+            <span class="badge ${node.online ? 'badge-success' : 'badge-danger'}">
+              ${node.online ? '● Online' : '○ Offline'}
+            </span>
+          </div>
+          <div class="node-metrics">
+            <div class="metric-item">
+              <span class="metric-label">RPC Endpoint</span>
+              <span class="metric-val mono">: ${node.port}</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Block Height</span>
+              <span class="metric-val mono">#${node.blockNumber}</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Contract Status</span>
+              <span class="metric-val">${node.contractDeployed ? '✓ Deployed' : 'Not Deployed'}</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Role</span>
+              <span class="metric-val">${node.role.toUpperCase()}</span>
+            </div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    } catch (e) {
+      console.warn('Failed to load node statuses:', e.message);
+    }
+  }
+
+  // --- TAB 4: Data Explorer ---
+  async function loadChainData(filterPort = 'all') {
+    const tbody = document.getElementById('data-table-tbody');
+    if (!tbody) return;
+
+    try {
+      const res = await fetch('/api/data');
+      const json = await res.json();
+      if (!json.success || !json.data) return;
+
+      const allData = json.data;
+      let records = [];
+
+      if (filterPort === 'all') {
+        Object.values(allData).forEach(chainRecs => {
+          if (Array.isArray(chainRecs)) records.push(...chainRecs);
+        });
+      } else {
+        records = allData[filterPort] || [];
+      }
+
+      records.sort((a, b) => b.timestamp - a.timestamp);
+
+      if (records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No clinical records found on selected blockchain(s).</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = '';
+      records.forEach(rec => {
+        const tr = document.createElement('tr');
+        const badgeClass = getResourceBadgeClass(rec.resourceType);
+
+        tr.innerHTML = `
+          <td><strong>#${rec.blockNumber}</strong></td>
+          <td>${rec.chainName || `Port ${rec.portNumber}`}</td>
+          <td><strong>${rec.patientId}</strong></td>
+          <td><span class="badge ${badgeClass}">${rec.resourceType}</span></td>
+          <td><code>${rec.clinicalCode}</code></td>
+          <td title="${rec.dataHash}"><code class="mono-code">${rec.dataHash ? rec.dataHash.slice(0, 10) : ''}...</code></td>
+          <td>${rec.timestampIso ? new Date(rec.timestampIso).toLocaleString() : ''}</td>
+          <td>
+            <button class="btn btn-outline btn-sm btn-inspect-fhir" data-fhir='${JSON.stringify(rec.resourceData || {}).replace(/'/g, "&apos;")}'>
+              Inspect FHIR
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      tbody.querySelectorAll('.btn-inspect-fhir').forEach(btn => {
+        btn.addEventListener('click', () => {
+          try {
+            const data = JSON.parse(btn.getAttribute('data-fhir'));
+            openFhirModal(data);
+          } catch (e) {
+            alert('Failed to parse FHIR JSON: ' + e.message);
+          }
+        });
+      });
+    } catch (e) {
+      console.warn('Failed to load chain data:', e.message);
+    }
+  }
+
+  function getResourceBadgeClass(type) {
+    const t = (type || '').toLowerCase();
+    if (t === 'patient') return 'badge-resource-patient';
+    if (t === 'observation') return 'badge-resource-obs';
+    if (t === 'condition') return 'badge-resource-cond';
+    if (t === 'encounter') return 'badge-resource-enc';
+    if (t === 'diagnosticreport') return 'badge-resource-diag';
+    if (t === 'medicationrequest') return 'badge-resource-med';
+    return 'badge-primary';
+  }
+
+  // Add Patient Record Form Submission
+  const formAddPatientRecord = document.getElementById('form-add-patient-record');
+  if (formAddPatientRecord) {
+    formAddPatientRecord.addEventListener('submit', async e => {
+      e.preventDefault();
+      const port = Number(document.getElementById('patient-chain-select').value);
+      const patientId = document.getElementById('patient-id-input').value.trim();
+      const resourceType = document.getElementById('resource-type-select').value;
+      const clinicalCode = document.getElementById('clinical-code-input').value.trim();
+      const rawJson = document.getElementById('resource-data-input').value.trim();
+      const resultDiv = document.getElementById('add-record-result');
+
+      let parsedPayload;
+      try {
+        parsedPayload = JSON.parse(rawJson);
+      } catch (err) {
+        alert('Invalid JSON in FHIR Resource Payload: ' + err.message);
+        return;
+      }
+
+      resultDiv.className = 'add-result-msg';
+      resultDiv.textContent = 'Committing record to organization blockchain with active credentials...';
 
       try {
         const res = await fetch('/api/add-patient-record', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Caller-Address': currentPersona.address
+          },
           body: JSON.stringify({
             port,
             patientId,
             resourceType,
             clinicalCode,
-            resourceData: parsedData
+            resourceData: parsedPayload,
+            callerAddress: currentPersona.address
+          })
+        });
+        const json = await res.json();
+        if (json.success) {
+          resultDiv.className = 'add-result-msg show-success';
+          resultDiv.textContent = `✓ Record committed! Block #${json.blockNumber !== undefined ? json.blockNumber : ''} | SHA-256: ${json.dataHash.slice(0, 16)}... | Caller: ${currentPersona.name}`;
+          loadChainData();
+        } else {
+          resultDiv.className = 'add-result-msg show-error';
+          resultDiv.textContent = `✗ Commit Rejected: ${json.error}`;
+        }
+      } catch (err) {
+        resultDiv.className = 'add-result-msg show-error';
+        resultDiv.textContent = `Network error: ${err.message}`;
+      }
+    });
+  }
+
+  const btnRefreshData = document.getElementById('btn-refresh-data');
+  if (btnRefreshData) {
+    btnRefreshData.addEventListener('click', () => {
+      const filter = document.getElementById('data-chain-filter');
+      loadChainData(filter ? filter.value : 'all');
+    });
+  }
+
+  const dataFilter = document.getElementById('data-chain-filter');
+  if (dataFilter) {
+    dataFilter.addEventListener('change', () => {
+      loadChainData(dataFilter.value);
+    });
+  }
+
+  // --- TAB 5: Multi-Chain Search ---
+  const formSearch = document.getElementById('form-search');
+  if (formSearch) {
+    formSearch.addEventListener('submit', async e => {
+      e.preventDefault();
+      executeSearch();
+    });
+  }
+
+  document.querySelectorAll('.chip-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const query = btn.getAttribute('data-query');
+      const type = btn.getAttribute('data-type');
+      const input = document.getElementById('search-value-input');
+      const typeSelect = document.getElementById('search-query-type');
+      if (input) input.value = query;
+      if (typeSelect) typeSelect.value = type;
+      executeSearch();
+    });
+  });
+
+  async function executeSearch() {
+    const input = document.getElementById('search-value-input');
+    const typeSelect = document.getElementById('search-query-type');
+    const algoRadios = document.getElementsByName('algorithm');
+    const resultsSec = document.getElementById('search-results-section');
+
+    let algorithm = 'BFS';
+    algoRadios.forEach(r => { if (r.checked) algorithm = r.value; });
+
+    const searchValue = input ? input.value.trim() : 'P101';
+    const queryType = typeSelect ? typeSelect.value : 'patientId';
+
+    try {
+      const res = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          algorithm,
+          searchValue,
+          queryType,
+          startNetworkId: 11102
+        })
+      });
+      const json = await res.json();
+      if (!json.success || !json.result) return;
+
+      const result = json.result;
+      if (resultsSec) resultsSec.style.display = 'block';
+
+      renderSearchResults(result);
+    } catch (e) {
+      alert('Search failed: ' + e.message);
+    }
+  }
+
+  function renderSearchResults(result) {
+    const routeList = document.getElementById('traversal-route-list');
+    const stats = document.getElementById('traversal-stats');
+    const algoBadge = document.getElementById('search-algo-badge');
+    const timelineContainer = document.getElementById('ehr-timeline-container');
+    const matchesBadge = document.getElementById('search-matches-badge');
+
+    if (algoBadge) algoBadge.textContent = `${result.algorithm} Traversal`;
+
+    // Traversal Path
+    if (stats) {
+      stats.innerHTML = `
+        <span>Visited Organizations: <strong>${result.visitedCount}</strong></span> |
+        <span>Query: <strong>${result.query.searchValue}</strong> (${result.query.queryType})</span>
+      `;
+    }
+
+    if (routeList) {
+      routeList.innerHTML = '';
+      result.traversalPath.forEach(step => {
+        const stepDiv = document.createElement('div');
+        stepDiv.className = `traversal-step ${step.found ? 'match-step' : ''}`;
+        stepDiv.innerHTML = `
+          <div class="step-badge">${step.step}</div>
+          <div class="step-details">
+            <div class="step-title">${step.name} (: ${step.port})</div>
+            <div class="step-meta">Level ${step.level} | Net ID ${step.networkId}</div>
+          </div>
+          ${step.found ? '<span class="badge badge-success">✓ Record Matched</span>' : '<span class="badge badge-secondary">Searched</span>'}
+        `;
+        routeList.appendChild(stepDiv);
+      });
+    }
+
+    // Longitudinal EHR Timeline
+    const records = result.longitudinalRecord || [];
+    if (matchesBadge) matchesBadge.textContent = `${records.length} Clinical Events`;
+
+    if (timelineContainer) {
+      if (records.length === 0) {
+        timelineContainer.innerHTML = '<div class="empty-state">No matching clinical events found across the consortium tree.</div>';
+        return;
+      }
+
+      timelineContainer.innerHTML = '';
+      records.forEach((rec, idx) => {
+        const card = document.createElement('div');
+        card.className = 'timeline-card';
+        const badgeClass = getResourceBadgeClass(rec.resourceType);
+
+        card.innerHTML = `
+          <div class="timeline-header">
+            <div class="timeline-title-row">
+              <span class="badge ${badgeClass}">${rec.resourceType}</span>
+              <strong>${rec.clinicalCode}</strong>
+              <span class="timeline-chain">${rec.chainName} (: ${rec.portNumber})</span>
+            </div>
+            <span class="timeline-time">${rec.timestampIso ? new Date(rec.timestampIso).toLocaleString() : ''}</span>
+          </div>
+          <div class="timeline-body">
+            <div>Patient: <strong>${rec.patientId}</strong> | Block <strong>#${rec.blockNumber}</strong></div>
+            <div class="timeline-hash">SHA-256 Digest: <code>${rec.dataHash}</code></div>
+          </div>
+          <div class="timeline-footer">
+            <button class="btn btn-outline btn-sm btn-inspect-timeline" data-idx="${idx}">
+              Inspect Decoded FHIR JSON
+            </button>
+          </div>
+        `;
+        timelineContainer.appendChild(card);
+      });
+
+      timelineContainer.querySelectorAll('.btn-inspect-timeline').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = Number(btn.getAttribute('data-idx'));
+          if (records[idx]) {
+            openFhirModal(records[idx].resourceData);
+          }
+        });
+      });
+    }
+  }
+
+  // --- TAB 6: Spin Up Fork ---
+  const formCreateFork = document.getElementById('form-create-fork');
+  if (formCreateFork) {
+    formCreateFork.addEventListener('submit', async e => {
+      e.preventDefault();
+      const name = document.getElementById('fork-chain-name').value.trim();
+      const parentNetworkId = Number(document.getElementById('fork-parent-select').value);
+      const forkBlockNumber = document.getElementById('fork-block-input').value;
+      const initialDataStr = document.getElementById('fork-initial-data').value.trim();
+
+      const initialData = initialDataStr ? initialDataStr.split(',').map(s => s.trim()) : [];
+      const statusBadge = document.getElementById('spinup-status-badge');
+      const resultPanel = document.getElementById('spinup-result-panel');
+
+      if (statusBadge) {
+        statusBadge.textContent = 'Provisioning...';
+        statusBadge.className = 'badge badge-primary';
+      }
+
+      // Step animations
+      const s1 = document.getElementById('step-1');
+      const s2 = document.getElementById('step-2');
+      const s3 = document.getElementById('step-3');
+      const s4 = document.getElementById('step-4');
+      const s5 = document.getElementById('step-5');
+
+      [s1, s2, s3, s4, s5].forEach(s => { if (s) s.className = 'step-item active'; });
+
+      try {
+        const res = await fetch('/api/fork/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            parentNetworkId,
+            forkBlockNumber: forkBlockNumber ? Number(forkBlockNumber) : undefined,
+            initialData
           })
         });
         const json = await res.json();
 
         if (json.success) {
-          statusDiv.className = 'alert-msg show-success';
-          statusDiv.textContent = `✓ ${json.message} (SHA-256: ${json.dataHash ? json.dataHash.slice(0, 16) : ''}...)`;
-          loadChainData(chainFilter ? chainFilter.value : 'all');
+          [s1, s2, s3, s4, s5].forEach(s => { if (s) s.className = 'step-item done'; });
+          if (statusBadge) {
+            statusBadge.textContent = '✓ Live';
+            statusBadge.className = 'badge badge-success';
+          }
+          if (resultPanel) {
+            resultPanel.style.display = 'block';
+            resultPanel.className = 'spinup-result-panel show-success';
+            resultPanel.innerHTML = `
+              <strong>✓ Forked Node Online!</strong>
+              <div>Port: <code>${json.node.port}</code> | Net ID: <code>${json.node.networkId}</code></div>
+              <div>Contract: <code>${json.node.contractAddress}</code></div>
+            `;
+          }
+          loadTreeTopology();
+          fetchChains();
         } else {
-          statusDiv.className = 'alert-msg show-error';
-          statusDiv.textContent = `Error: ${json.error}`;
+          throw new Error(json.error);
         }
       } catch (err) {
-        statusDiv.className = 'alert-msg show-error';
-        statusDiv.textContent = `Error: ${err.message}`;
+        if (statusBadge) {
+          statusBadge.textContent = 'Failed';
+          statusBadge.className = 'badge badge-danger';
+        }
+        if (resultPanel) {
+          resultPanel.style.display = 'block';
+          resultPanel.className = 'spinup-result-panel show-error';
+          resultPanel.textContent = 'Error: ' + err.message;
+        }
       }
     });
   }
 
-  // Search Form
-  const formSearch = document.getElementById('form-search');
-  if (formSearch) {
-    formSearch.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const algorithm = document.getElementById('search-algorithm').value;
-      const searchValue = document.getElementById('search-value').value.trim();
-      const startNetworkId = document.getElementById('search-root').value;
-      const queryType = document.getElementById('search-query-type') ? document.getElementById('search-query-type').value : null;
-      executeSearch(algorithm, startNetworkId, searchValue, queryType);
+  const btnUseLatest = document.getElementById('btn-use-latest-block');
+  if (btnUseLatest) {
+    btnUseLatest.addEventListener('click', async () => {
+      const parentSelect = document.getElementById('fork-parent-select');
+      const blockInput = document.getElementById('fork-block-input');
+      if (!parentSelect || !blockInput) return;
+
+      const parentNetId = Number(parentSelect.value);
+      const chains = await fetchChains();
+      const parent = chains.find(c => c.networkId === parentNetId);
+      if (parent) {
+        blockInput.value = parent.blockNumber;
+      }
     });
   }
 
-  // Search Chips
-  document.querySelectorAll('.chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      const val = chip.getAttribute('data-search');
-      const algo = chip.getAttribute('data-algo') || document.getElementById('search-algorithm').value;
-      const qType = chip.getAttribute('data-type') || '';
-      document.getElementById('search-value').value = val;
-      document.getElementById('search-algorithm').value = algo;
-      const qSelect = document.getElementById('search-query-type');
-      if (qSelect) qSelect.value = qType;
-      executeSearch(algo, 11102, val, qType || null);
-    });
-  });
+  // --- Modal Logic ---
+  function openFhirModal(data) {
+    const modal = document.getElementById('fhir-modal');
+    const codeBlock = document.getElementById('modal-json-content');
+    const resBadge = document.getElementById('modal-badge-resource');
 
-  // Create Fork Form
-  const formCreateFork = document.getElementById('form-create-fork');
-  if (formCreateFork) {
-    formCreateFork.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const name = document.getElementById('fork-name').value.trim();
-      const parentNetworkId = document.getElementById('fork-parent-select').value;
-      const forkBlockNumber = document.getElementById('fork-block-num').value;
-      const initialDataStr = document.getElementById('fork-initial-data').value.trim();
-      const initialData = initialDataStr ? initialDataStr.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n)) : [];
+    if (codeBlock) {
+      codeBlock.textContent = JSON.stringify(data, null, 2);
+    }
+    if (resBadge && data && data.resourceType) {
+      resBadge.textContent = data.resourceType;
+    }
+    if (modal) modal.style.display = 'flex';
+  }
 
-      const btnSubmit = document.getElementById('btn-submit-fork');
-      const progressContainer = document.getElementById('fork-create-progress');
-      const resultDiv = document.getElementById('fork-create-result');
+  function closeFhirModal() {
+    const modal = document.getElementById('fhir-modal');
+    if (modal) modal.style.display = 'none';
+  }
 
-      btnSubmit.disabled = true;
-      btnSubmit.textContent = '⏳ Spinning Up Fork...';
-      progressContainer.style.display = 'block';
-      resultDiv.style.display = 'none';
+  const closeBtn = document.getElementById('modal-close-btn');
+  const closeBtnFooter = document.getElementById('btn-close-fhir-modal');
+  if (closeBtn) closeBtn.addEventListener('click', closeFhirModal);
+  if (closeBtnFooter) closeBtnFooter.addEventListener('click', closeFhirModal);
 
-      const setStep = (id, state, text) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.className = `progress-step-item ${state}`;
-        if (text) el.textContent = text;
-      };
-
-      setStep('step-port', 'active', '1. Allocating dynamic Port & Chain ID...');
-      setStep('step-node', 'pending', '2. Boot JSON-RPC 2.0 Ethereum node');
-      setStep('step-contract', 'pending', '3. Deploy BlockData smart contract');
-      setStep('step-repo', 'pending', '4. Register fork event in StoreForkEvent (Port 8545)');
-      setStep('step-data', 'pending', '5. Ingest initial data points');
-
-      try {
-        await new Promise(r => setTimeout(r, 200));
-        setStep('step-port', 'done', '✓ 1. Dynamic Port & Chain ID Allocated');
-        setStep('step-node', 'active', '2. Booting JSON-RPC 2.0 Ethereum node...');
-
-        const res = await fetch('/api/fork/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, parentNetworkId, forkBlockNumber, initialData })
+  const copyBtn = document.getElementById('btn-copy-fhir');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+      const codeBlock = document.getElementById('modal-json-content');
+      if (codeBlock) {
+        navigator.clipboard.writeText(codeBlock.textContent).then(() => {
+          copyBtn.textContent = '✓ Copied!';
+          setTimeout(() => { copyBtn.textContent = '📋 Copy JSON'; }, 2000);
         });
-        const json = await res.json();
-
-        if (!json.success) throw new Error(json.error || 'Fork creation failed');
-
-        const node = json.node;
-        setStep('step-node', 'done', `✓ 2. Node live on Port ${node.port} (Chain ID: ${node.networkId})`);
-        setStep('step-contract', 'done', `✓ 3. BlockData contract deployed at ${node.contractAddress.slice(0, 14)}...`);
-        setStep('step-repo', 'done', `✓ 4. Fork registered in Repository (Parent: ${node.parentNetworkId} @ Block ${node.forkBlockNumber})`);
-        setStep('step-data', 'done', `✓ 5. Ingested ${node.initialData ? node.initialData.length : 0} initial data points`);
-
-        // Success Card
-        resultDiv.style.display = 'block';
-        resultDiv.innerHTML = `
-          <div class="node-created-card">
-            <div class="node-created-title">
-              <span>🎉</span>
-              <span>Blockchain Successfully Forked & Online!</span>
-            </div>
-            <div class="node-created-meta">
-              <div class="node-meta-item">
-                <div class="node-meta-label">Chain Name</div>
-                <div class="node-meta-value">${node.name}</div>
-              </div>
-              <div class="node-meta-item">
-                <div class="node-meta-label">RPC Endpoint</div>
-                <div class="node-meta-value">${node.rpcUrl}</div>
-              </div>
-              <div class="node-meta-item">
-                <div class="node-meta-label">Network ID</div>
-                <div class="node-meta-value">${node.networkId}</div>
-              </div>
-              <div class="node-meta-item">
-                <div class="node-meta-label">Parent Chain</div>
-                <div class="node-meta-value">Network ${node.parentNetworkId} (Fork @ #${node.forkBlockNumber})</div>
-              </div>
-            </div>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <button type="button" class="btn btn-outline" style="font-size: 12px;" onclick="document.querySelector('[data-tab=tree]').click();">
-                🌳 View in Topology Graph
-              </button>
-              <button type="button" class="btn btn-outline" style="font-size: 12px;" onclick="document.querySelector('[data-tab=nodes]').click();">
-                ⚡ View in Nodes Monitor
-              </button>
-              <button type="button" class="btn btn-outline" style="font-size: 12px;" onclick="document.querySelector('[data-tab=data]').click();">
-                📊 Add Data to this Chain
-              </button>
-            </div>
-          </div>
-        `;
-
-        document.getElementById('fork-name').value = '';
-        document.getElementById('fork-initial-data').value = '';
-
-        await populateChainDropdowns();
-        loadTreeTopology();
-        loadNodesStatus();
-        loadChainData();
-      } catch (err) {
-        resultDiv.style.display = 'block';
-        resultDiv.innerHTML = `<div class="alert-msg show-error">Failed to spin up forked chain: ${err.message}</div>`;
-      } finally {
-        btnSubmit.disabled = false;
-        btnSubmit.textContent = '🚀 Start & Spin Up Node';
       }
     });
   }
 
-  // Parent selector change updates fork block number
-  const forkParentSelect = document.getElementById('fork-parent-select');
-  if (forkParentSelect) {
-    forkParentSelect.addEventListener('change', updateForkBlockFromParent);
-  }
-
-  const btnUseLatestBlock = document.getElementById('btn-use-latest-block');
-  if (btnUseLatestBlock) {
-    btnUseLatestBlock.addEventListener('click', updateForkBlockFromParent);
-  }
-
-  // Initial Load
-  populateChainDropdowns();
+  // --- Boot Initialization ---
+  initPersonas();
   loadTreeTopology();
-  loadNodesStatus();
-  loadChainData();
+  fetchChains().then(() => {
+    populateDataChainSelect();
+  });
 });
-
-// Load Nodes Status
-async function loadNodesStatus() {
-  const container = document.getElementById('nodes-grid');
-  if (!container) return;
-
-  try {
-    const res = await fetch('/api/status');
-    const json = await res.json();
-    const nodes = json.nodes || [];
-
-    const activeCount = nodes.filter(n => n.online).length;
-    document.getElementById('global-status').textContent = `${activeCount}/${nodes.length} Chains Active`;
-
-    container.innerHTML = nodes.map(node => `
-      <div class="node-card">
-        <div class="node-card-top">
-          <h4>${node.name}</h4>
-          <span class="status-indicator">
-            <span class="status-dot ${node.online ? 'pulsing' : ''}" style="background-color: ${node.online ? 'var(--accent-green)' : 'var(--accent-red)'}"></span>
-            ${node.online ? 'Online' : 'Offline'}
-          </span>
-        </div>
-        <div class="node-stats">
-          <div class="stat-row">
-            <span>Role:</span>
-            <span class="badge ${node.role === 'repository' ? 'badge-info' : (node.isRoot ? 'badge-primary' : 'badge-warning')}">${node.role}</span>
-          </div>
-          <div class="stat-row">
-            <span>Network ID:</span>
-            <span class="stat-val">${node.networkId}</span>
-          </div>
-          <div class="stat-row">
-            <span>RPC Port:</span>
-            <span class="stat-val">${node.port}</span>
-          </div>
-          <div class="stat-row">
-            <span>Block Height:</span>
-            <span class="stat-val">#${node.blockNumber}</span>
-          </div>
-          <div class="stat-row">
-            <span>Dev Balance:</span>
-            <span class="stat-val">${parseFloat(node.balance).toFixed(2)} ETH</span>
-          </div>
-          <div class="stat-row" style="margin-top: 4px;">
-            <span>Contract:</span>
-            <span class="stat-val" style="font-size: 10px;" title="${node.contractAddress || 'None'}">
-              ${node.contractAddress ? node.contractAddress.slice(0, 10) + '...' : 'Not deployed'}
-            </span>
-          </div>
-        </div>
-      </div>
-    `).join('');
-  } catch (err) {
-    container.innerHTML = `<div class="alert-msg show-error">Failed to load nodes: ${err.message}</div>`;
-  }
-}
-
-let cachedChains = [];
-
-// Populate all chain dropdowns dynamically
-async function populateChainDropdowns() {
-  try {
-    const res = await fetch('/api/chains');
-    const json = await res.json();
-    cachedChains = json.chains || [];
-
-    // 1. Parent chain selector in "Spin Up Fork" (#fork-parent-select)
-    const forkParentSelect = document.getElementById('fork-parent-select');
-    if (forkParentSelect) {
-      const prevVal = forkParentSelect.value;
-      forkParentSelect.innerHTML = cachedChains.map(c => `
-        <option value="${c.networkId}" ${c.networkId === 11102 ? 'selected' : ''}>
-          ${c.name} (Port ${c.port} | Net ${c.networkId}${c.isRoot ? ' - ROOT' : ''} | Block #${c.blockNumber})
-        </option>
-      `).join('');
-      if (prevVal && cachedChains.some(c => c.networkId.toString() === prevVal)) {
-        forkParentSelect.value = prevVal;
-      }
-      updateForkBlockFromParent();
-    }
-
-    // 2. Data Explorer filter dropdown (#chain-filter)
-    const chainFilter = document.getElementById('chain-filter');
-    if (chainFilter) {
-      const currentVal = chainFilter.value || 'all';
-      chainFilter.innerHTML = `
-        <option value="all">All Blockchains (Aggregate)</option>
-        ${cachedChains.map(c => `
-          <option value="${c.port}">${c.name} (Port ${c.port})</option>
-        `).join('')}
-      `;
-      chainFilter.value = currentVal;
-    }
-
-    // 3. Add Data Target dropdown (#add-target-port)
-    const addTargetPort = document.getElementById('add-target-port');
-    if (addTargetPort) {
-      const currentVal = addTargetPort.value;
-      addTargetPort.innerHTML = cachedChains.map(c => `
-        <option value="${c.port}">Port ${c.port} (${c.name})</option>
-      `).join('');
-      if (currentVal && cachedChains.some(c => c.port.toString() === currentVal)) {
-        addTargetPort.value = currentVal;
-      }
-    }
-
-    // 4. Search Root Chain dropdown (#search-root)
-    const searchRoot = document.getElementById('search-root');
-    if (searchRoot) {
-      const currentVal = searchRoot.value || '11102';
-      searchRoot.innerHTML = cachedChains.map(c => `
-        <option value="${c.networkId}" ${c.networkId.toString() === currentVal ? 'selected' : ''}>
-          ${c.name} (Net ${c.networkId} | Port ${c.port}${c.isRoot ? ' - Root' : ''})
-        </option>
-      `).join('');
-    }
-  } catch (err) {
-    console.error('Failed to populate chain dropdowns:', err);
-  }
-}
-
-function updateForkBlockFromParent() {
-  const select = document.getElementById('fork-parent-select');
-  const input = document.getElementById('fork-block-num');
-  if (!select || !input) return;
-  const parentId = parseInt(select.value, 10);
-  const parent = cachedChains.find(c => c.networkId === parentId);
-  if (parent) {
-    input.value = parent.blockNumber || 0;
-  }
-}
-
-// Load Tree Topology & Render Interactive SVG
-async function loadTreeTopology() {
-  const svg = document.getElementById('tree-svg');
-  if (!svg) return;
-
-  try {
-    const res = await fetch('/api/tree');
-    const json = await res.json();
-    const tree = json.tree || {};
-    renderTreeSvg(svg, tree);
-  } catch (err) {
-    console.error('Failed to load tree topology:', err);
-  }
-}
-
-// Dynamic Hierarchical Tree SVG Renderer
-function renderTreeSvg(svg, tree) {
-  svg.innerHTML = '';
-  const containerWidth = svg.parentElement ? svg.parentElement.clientWidth : 700;
-  const nodes = tree.nodes || [];
-  const edges = tree.edges || [];
-  const adjacencyList = tree.adjacencyList || {};
-
-  if (nodes.length === 0) return;
-
-  // 1. Compute tree levels via BFS starting from Root chain (11102)
-  const levelMap = {};
-  const rootNode = nodes.find(n => n.isRoot) || nodes.find(n => n.id === '11102') || nodes[0];
-  const rootId = rootNode ? rootNode.id : '11102';
-
-  levelMap[rootId] = 0;
-  const queue = [rootId];
-  const visited = new Set([rootId]);
-
-  while (queue.length > 0) {
-    const currId = queue.shift();
-    const currLevel = levelMap[currId];
-    const children = adjacencyList[currId] || [];
-    for (const childId of children) {
-      if (!visited.has(childId)) {
-        visited.add(childId);
-        levelMap[childId] = currLevel + 1;
-        queue.push(childId);
-      }
-    }
-  }
-
-  // Handle any nodes not linked to root
-  nodes.forEach(n => {
-    if (levelMap[n.id] === undefined) {
-      levelMap[n.id] = (n.parentNetworkId && levelMap[n.parentNetworkId] !== undefined)
-        ? levelMap[n.parentNetworkId] + 1
-        : 1;
-    }
-  });
-
-  // 2. Group nodes by level
-  const levels = {};
-  nodes.forEach(n => {
-    const lvl = levelMap[n.id] || 0;
-    if (!levels[lvl]) levels[lvl] = [];
-    levels[lvl].push(n);
-  });
-
-  const maxLevel = Math.max(...Object.keys(levels).map(Number), 1);
-  const maxNodesInAnyLevel = Math.max(...Object.values(levels).map(arr => arr.length), 1);
-
-  // Dynamic canvas sizing
-  const width = Math.max(containerWidth, maxNodesInAnyLevel * 190 + 140);
-  const height = Math.max(450, 100 + (maxLevel + 1) * 125);
-  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-  svg.style.minWidth = `${width}px`;
-  svg.style.height = `${height}px`;
-
-  const levelColors = ['#388bfd', '#e3b341', '#bc8cff', '#39c5cf', '#f778ba', '#ff7b72'];
-
-  // 3. Compute (x, y) coordinates
-  const positions = {};
-
-  // Repository node position (Port 8545 / 11101)
-  positions['11101'] = {
-    x: 95,
-    y: 50,
-    color: '#39c5cf',
-    label: '11101: Repo (Port 8545)',
-    fullLabel: 'Repository Chain (Port 8545)'
-  };
-
-  Object.keys(levels).sort((a, b) => Number(a) - Number(b)).forEach(lvlStr => {
-    const lvl = Number(lvlStr);
-    const nodesAtLvl = levels[lvl];
-    const k = nodesAtLvl.length;
-    const y = 80 + lvl * 120;
-    const col = levelColors[lvl % levelColors.length];
-
-    nodesAtLvl.forEach((node, idx) => {
-      const x = (idx + 1) * (width / (k + 1));
-      const shortName = node.name.length > 14 ? node.name.slice(0, 14) + '...' : node.name;
-      positions[node.id] = {
-        x,
-        y,
-        color: col,
-        label: `${node.id}: ${shortName} (Port ${node.port})`,
-        fullLabel: `${node.name} (Port ${node.port} | Net ${node.id})`
-      };
-    });
-  });
-
-  // 4. Draw Edges (Curved Bezier connectors)
-  edges.forEach(edge => {
-    const src = positions[edge.source];
-    const tgt = positions[edge.target];
-    if (src && tgt) {
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      const d = `M ${src.x} ${src.y} C ${src.x} ${(src.y + tgt.y) / 2}, ${tgt.x} ${(src.y + tgt.y) / 2}, ${tgt.x} ${tgt.y}`;
-      line.setAttribute('d', d);
-      line.setAttribute('class', 'tree-link');
-      line.setAttribute('id', `edge-${edge.source}-${edge.target}`);
-      svg.appendChild(line);
-
-      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      text.setAttribute('x', (src.x + tgt.x) / 2 + 6);
-      text.setAttribute('y', (src.y + tgt.y) / 2);
-      text.setAttribute('fill', '#8b949e');
-      text.setAttribute('font-size', '11');
-      text.setAttribute('font-family', 'JetBrains Mono');
-      text.textContent = `Fork @ Block ${edge.forkBlock}`;
-      svg.appendChild(text);
-    }
-  });
-
-  // Reference connection from Repo to Root
-  if (positions['11101'] && positions[rootId]) {
-    const repoEdge = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    repoEdge.setAttribute('d', `M ${positions['11101'].x} ${positions['11101'].y} L ${positions[rootId].x} ${positions[rootId].y}`);
-    repoEdge.setAttribute('stroke', 'rgba(57, 197, 207, 0.4)');
-    repoEdge.setAttribute('stroke-width', '1.5');
-    repoEdge.setAttribute('stroke-dasharray', '3 3');
-    repoEdge.setAttribute('fill', 'none');
-    svg.appendChild(repoEdge);
-  }
-
-  // 5. Draw Node cards
-  Object.keys(positions).forEach(key => {
-    const p = positions[key];
-    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    g.setAttribute('class', 'node-group');
-    g.setAttribute('id', `node-g-${key}`);
-
-    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    rect.setAttribute('x', p.x - 85);
-    rect.setAttribute('y', p.y - 20);
-    rect.setAttribute('width', 170);
-    rect.setAttribute('height', 40);
-    rect.setAttribute('rx', 8);
-    rect.setAttribute('fill', '#161b22');
-    rect.setAttribute('stroke', p.color);
-    rect.setAttribute('stroke-width', 1.5);
-    g.appendChild(rect);
-
-    const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    txt.setAttribute('x', p.x);
-    txt.setAttribute('y', p.y + 4);
-    txt.setAttribute('text-anchor', 'middle');
-    txt.setAttribute('fill', '#f0f6fc');
-    txt.setAttribute('font-size', '11');
-    txt.setAttribute('font-weight', '600');
-    txt.setAttribute('font-family', 'Inter');
-    txt.textContent = p.label;
-    g.appendChild(txt);
-
-    const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-    title.textContent = p.fullLabel || p.label;
-    g.appendChild(title);
-
-    svg.appendChild(g);
-  });
-}
-
-// Global in-memory record cache for modal viewer
-window.__currentRecords = [];
-
-// Load Chain Data (HL7 Patient Health Records)
-async function loadChainData(portFilter = 'all') {
-  const tbody = document.getElementById('data-table-body');
-  if (!tbody) return;
-
-  try {
-    let rows = [];
-    if (portFilter === 'all') {
-      const res = await fetch('/api/data');
-      const json = await res.json();
-      const all = json.data || {};
-      Object.keys(all).forEach(port => {
-        if (Array.isArray(all[port])) {
-          rows.push(...all[port]);
-        }
-      });
-    } else {
-      const res = await fetch(`/api/data/${portFilter}`);
-      const json = await res.json();
-      rows = json.data || [];
-    }
-
-    window.__currentRecords = rows;
-
-    if (rows.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" class="text-center" style="color: var(--text-muted); padding: 24px;">No health records found on this chain.</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = rows.map((pt, idx) => {
-      const rType = pt.resourceType || 'Unknown';
-      const rTypeClass = `badge-resource-${rType.toLowerCase()}`;
-      const hashShort = pt.dataHash ? (pt.dataHash.slice(0, 10) + '...' + pt.dataHash.slice(-6)) : 'None';
-
-      return `
-        <tr>
-          <td><span class="badge badge-primary">#${pt.blockNumber}</span></td>
-          <td><code>Port ${pt.portNumber}</code></td>
-          <td><strong style="color: #58a6ff;">${pt.patientId || 'N/A'}</strong></td>
-          <td><span class="badge-resource ${rTypeClass}">${rType}</span></td>
-          <td><code>${pt.clinicalCode || '--'}</code></td>
-          <td><span style="font-family: var(--font-mono); font-size: 11px; color: var(--accent-gold);" title="${pt.dataHash || ''}">${hashShort}</span></td>
-          <td>
-            <button class="btn btn-sm btn-outline" onclick="viewFhirModalById(${idx})">View FHIR</button>
-          </td>
-        </tr>
-      `;
-    }).join('');
-  } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" class="text-center show-error">Failed to load data: ${err.message}</td></tr>`;
-  }
-}
-
-// Modal inspection logic
-window.viewFhirModalById = function(idx) {
-  const rec = window.__currentRecords[idx];
-  if (rec) openFhirModal(rec);
-};
-
-window.viewFhirModalRecord = function(rec) {
-  if (rec) openFhirModal(rec);
-};
-
-function openFhirModal(rec) {
-  const modal = document.getElementById('fhir-modal');
-  if (!modal) return;
-
-  const rType = rec.resourceType || 'Resource';
-  const badge = document.getElementById('modal-badge');
-  badge.className = `badge-resource badge-resource-${rType.toLowerCase()}`;
-  badge.textContent = rType;
-
-  document.getElementById('modal-title').textContent = `${rType} Resource (${rec.patientId || 'Patient'})`;
-  document.getElementById('modal-patient-id').textContent = rec.patientId || 'N/A';
-  document.getElementById('modal-clinical-code').textContent = rec.clinicalCode || 'None';
-  document.getElementById('modal-block-num').textContent = `#${rec.blockNumber}`;
-  document.getElementById('modal-chain').textContent = `Chain ${rec.networkId} (Port ${rec.portNumber})`;
-  document.getElementById('modal-hash').textContent = rec.dataHash || 'None';
-
-  const dataObj = rec.resourceData || {};
-  document.getElementById('modal-json-pre').textContent = typeof dataObj === 'string' ? dataObj : JSON.stringify(dataObj, null, 2);
-
-  modal.style.display = 'flex';
-}
-
-function closeFhirModal() {
-  const modal = document.getElementById('fhir-modal');
-  if (modal) modal.style.display = 'none';
-}
-
-// Wire up modal listeners
-document.addEventListener('DOMContentLoaded', () => {
-  const modalClose = document.getElementById('modal-close');
-  if (modalClose) modalClose.addEventListener('click', closeFhirModal);
-
-  const modal = document.getElementById('fhir-modal');
-  if (modal) {
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) closeFhirModal();
-    });
-  }
-
-  const btnCopy = document.getElementById('modal-copy-btn');
-  if (btnCopy) {
-    btnCopy.addEventListener('click', () => {
-      const code = document.getElementById('modal-json-pre').textContent;
-      navigator.clipboard.writeText(code).then(() => {
-        btnCopy.textContent = '✓ Copied!';
-        setTimeout(() => { btnCopy.textContent = '📋 Copy JSON'; }, 1500);
-      });
-    });
-  }
-});
-
-// Helper to summarize FHIR JSON for the clinical timeline card
-function summarizeFhirResource(rec) {
-  const rType = rec.resourceType;
-  const d = rec.resourceData || {};
-
-  if (rType === 'Patient') {
-    const name = d.name && d.name[0] ? `${d.name[0].given ? d.name[0].given.join(' ') : ''} ${d.name[0].family || ''}` : rec.patientId;
-    return `<strong>${name}</strong> | DOB: ${d.birthDate || 'N/A'} | Gender: ${d.gender || 'N/A'} | Active: ${d.active ? 'Yes' : 'No'}`;
-  }
-
-  if (rType === 'Observation') {
-    const val = d.valueQuantity ? `${d.valueQuantity.value} ${d.valueQuantity.unit}` : 'Result logged';
-    const interp = d.interpretation && d.interpretation[0] && d.interpretation[0].display ? ` (${d.interpretation[0].display})` : '';
-    const display = (d.code && d.code.coding && d.code.coding[0] && d.code.coding[0].display) || rec.clinicalCode;
-    return `<strong>${display}</strong>: <span style="color: var(--accent-gold); font-weight: 600;">${val}${interp}</span>`;
-  }
-
-  if (rType === 'Condition') {
-    const display = (d.code && d.code.coding && d.code.coding[0] && d.code.coding[0].display) || rec.clinicalCode;
-    const onset = d.onsetDateTime ? ` | Onset: ${d.onsetDateTime}` : '';
-    return `<strong>Diagnosis:</strong> ${display}${onset}`;
-  }
-
-  if (rType === 'Encounter') {
-    const cls = (d.class && d.class.display) || (d.class && d.class.code) || 'Visit';
-    const period = d.period ? ` (${d.period.start ? d.period.start.slice(0, 10) : ''} to ${d.period.end ? d.period.end.slice(0, 10) : ''})` : '';
-    const type = (d.type && d.type[0] && d.type[0].display) || 'Clinical Encounter';
-    return `<strong>${cls}:</strong> ${type}${period}`;
-  }
-
-  if (rType === 'DiagnosticReport') {
-    return `<strong>Report:</strong> ${d.conclusion || 'Report completed'}`;
-  }
-
-  if (rType === 'MedicationRequest') {
-    const med = (d.medicationCodeableConcept && d.medicationCodeableConcept.coding && d.medicationCodeableConcept.coding[0] && d.medicationCodeableConcept.coding[0].display) || rec.clinicalCode;
-    const dose = (d.dosageInstruction && d.dosageInstruction[0] && d.dosageInstruction[0].text) || '';
-    return `<strong>Prescription:</strong> ${med} ${dose ? `<em>(${dose})</em>` : ''}`;
-  }
-
-  return `<code>${rec.clinicalCode}</code>: ${typeof d === 'string' ? d : JSON.stringify(d).slice(0, 100)}`;
-}
-
-// Global cache for longitudinal records returned in search
-window.__searchRecords = [];
-
-// Execute Multi-Chain Tree Search (BFS or DFS) with Longitudinal EHR Reconstruction
-async function executeSearch(algorithm = 'BFS', startNetworkId = 11102, searchValue = 'P101', queryType = null) {
-  const container = document.getElementById('search-results-area');
-  if (!container) return;
-
-  const algoName = algorithm === 'BFS' ? 'Breadth-First Search (BFS)' : 'Depth-First Search (DFS)';
-
-  container.innerHTML = `
-    <div class="empty-state">
-      <div class="status-dot pulsing" style="width: 16px; height: 16px; margin: 0 auto 12px auto;"></div>
-      <p>Executing on-chain <strong>${algoName}</strong> across the blockchain tree for <strong>${searchValue}</strong>...</p>
-    </div>
-  `;
-
-  try {
-    const res = await fetch('/api/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ algorithm, startNetworkId, searchValue, queryType })
-    });
-    const json = await res.json();
-    const result = json.result;
-
-    if (!result) throw new Error('No result returned from search API');
-
-    let html = '';
-
-    // Summary Header
-    html += `
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
-        <div>
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-            <span class="badge ${result.algorithm === 'BFS' ? 'badge-info' : 'badge-purple'}">${result.algorithm} Traversal</span>
-            <span class="badge ${result.success ? 'badge-success' : 'badge-warning'}">
-              ${result.success ? 'Records Discovered' : 'No Matches'}
-            </span>
-          </div>
-          <h4>Query: <span style="color: var(--accent-gold); font-size: 18px;">${result.query.searchValue}</span> <span style="font-size: 12px; color: var(--text-secondary); font-weight: normal;">(${result.query.queryType})</span></h4>
-          <p style="color: var(--text-secondary); font-size: 13px;">Root Chain: <code>${result.query.startNetworkId}</code> | Visited: <strong>${result.visitedCount}</strong> nodes | Matches: <strong>${result.matches.length}</strong> chains</p>
-        </div>
-      </div>
-    `;
-
-    // Step-by-Step Traversal Route
-    html += `
-      <h4 style="font-size: 13px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">
-        Step-by-Step ${result.algorithm} Traversal Route:
-      </h4>
-      <div class="traversal-timeline">
-    `;
-
-    result.traversalPath.forEach(step => {
-      const lvl = step.level !== undefined ? step.level : step.depth;
-      html += `
-        <div class="traversal-step ${step.foundMatch ? 'match-step' : ''}">
-          <div class="step-badge">${step.step}</div>
-          <div class="step-details">
-            <div class="step-title">
-              ${step.name}
-              <span class="level-tag">${result.algorithm === 'BFS' ? 'Level' : 'Depth'} ${lvl}</span>
-            </div>
-            <div class="step-sub">Network ID: ${step.networkId} | Port: ${step.port}</div>
-          </div>
-          ${step.foundMatch ? `<div class="match-tag">★ RECORDS FOUND</div>` : `<span style="color: var(--text-muted); font-size: 12px;">Queried</span>`}
-        </div>
-      `;
-    });
-
-    html += `</div>`;
-
-    // Longitudinal Electronic Health Record (EHR) Reconstruction
-    if (result.longitudinalRecord && result.longitudinalRecord.length > 0) {
-      window.__searchRecords = result.longitudinalRecord;
-      const patientId = result.longitudinalRecord[0].patientId || result.query.searchValue;
-      const distinctChains = new Set(result.longitudinalRecord.map(r => r.networkId)).size;
-
-      html += `
-        <div class="ehr-timeline-container">
-          <div class="ehr-header-bar">
-            <div>
-              <h3 style="font-size: 15px; margin: 0; color: #58a6ff; display: flex; align-items: center; gap: 8px;">
-                <span>🩺</span> Longitudinal Electronic Health Record (EHR)
-              </h3>
-              <p style="font-size: 12px; color: var(--text-secondary); margin: 2px 0 0 0;">
-                Patient: <strong>${patientId}</strong> | Consolidated <strong>${result.longitudinalRecord.length}</strong> clinical events across <strong>${distinctChains}</strong> blockchain branches.
-              </p>
-            </div>
-            <span class="badge badge-success">Cryptographically Verified</span>
-          </div>
-
-          <div class="ehr-records-grid">
-            ${result.longitudinalRecord.map((rec, rIdx) => {
-              const rType = rec.resourceType || 'Record';
-              const summaryText = summarizeFhirResource(rec);
-              const hashSnippet = rec.dataHash ? rec.dataHash.slice(0, 12) + '...' + rec.dataHash.slice(-6) : '';
-
-              return `
-                <div class="ehr-record-card type-${rType}">
-                  <div class="ehr-card-top">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                      <span class="badge-resource badge-resource-${rType.toLowerCase()}">${rType}</span>
-                      <strong style="font-size: 13px; color: var(--text-primary);">${rec.clinicalCode || rType}</strong>
-                    </div>
-                    <div class="ehr-card-meta">
-                      <span>Chain ${rec.networkId} (Port ${rec.portNumber})</span>
-                      <span>Block #${rec.blockNumber}</span>
-                    </div>
-                  </div>
-
-                  <div class="ehr-card-content">
-                    ${summaryText}
-                  </div>
-
-                  <div class="ehr-card-footer">
-                    <span>SHA-256: <code style="color: var(--accent-gold); font-size: 10px;">${hashSnippet}</code></span>
-                    <button class="btn btn-sm btn-outline" onclick="viewSearchRecordById(${rIdx})">Inspect FHIR JSON</button>
-                  </div>
-                </div>
-              `;
-            }).join('')}
-          </div>
-        </div>
-      `;
-    } else if (result.matches.length > 0) {
-      // Legacy integer match display
-      html += `
-        <div style="margin-top: 24px; padding: 16px; background: rgba(227, 179, 65, 0.08); border: 1px solid rgba(227, 179, 65, 0.3); border-radius: var(--radius-sm);">
-          <h4 style="color: var(--accent-gold); font-size: 14px; margin-bottom: 8px;">✓ Matching Block Confirmation:</h4>
-          ${result.matches.map(m => `
-            <p style="font-size: 13px; color: var(--text-primary); margin-bottom: 4px;">
-              Chain <strong>${m.name}</strong> (Port <code>${m.port}</code>) matched target <strong>${m.searchValue}</strong> at <strong>Block #${m.matchingBlocks.join(', #')}</strong> on <strong>${result.algorithm === 'BFS' ? 'Level' : 'Depth'} ${m.level !== undefined ? m.level : m.depth}</strong>.
-            </p>
-          `).join('')}
-        </div>
-      `;
-    }
-
-    container.innerHTML = html;
-  } catch (err) {
-    container.innerHTML = `<div class="alert-msg show-error">Search failed: ${err.message}</div>`;
-  }
-}
-
-window.viewSearchRecordById = function(idx) {
-  const rec = window.__searchRecords[idx];
-  if (rec) openFhirModal(rec);
-};
-
-// Retain aliases for backward compatibility
-window.executeDfsSearch = (startNetworkId, searchValue) => executeSearch('DFS', startNetworkId, searchValue);
-window.executeSearch = executeSearch;
-
