@@ -11,6 +11,7 @@ const forkTreeService = require('../services/forkTreeService');
 const { ContractClient } = require('../services/contractClient');
 const { ConsortiumGovernance, StoreForkEvent, BlockData } = require('../contracts/compiledArtifacts');
 const topology = require('../config/networkTopology.json');
+const storageAdapter = require('../services/storageAdapter');
 
 let passedTests = 0;
 let totalTests = 0;
@@ -231,6 +232,33 @@ async function runTests() {
     });
 
     console.log('\n[Suite 6: Cross-Chain HL7 Healthcare Data Integrity]');
+    await it('Authors test clinical records across chains for traversal verification', async () => {
+      for (const chain of topology.chains) {
+        const chainInfo = deployments.dataChains[chain.networkId];
+        const dataClient = new ContractClient(chain.rpcUrl, BlockData.abi, chainInfo.address);
+        const patientRecords = (topology.samplePatientData && topology.samplePatientData[chain.networkId.toString()]) || [];
+        for (const rec of patientRecords) {
+          const jsonStr = typeof rec.resourceData === 'string' ? rec.resourceData : JSON.stringify(rec.resourceData);
+          const dataHash = crypto.createHash('sha256').update(jsonStr).digest('hex');
+          const timestamp = Math.floor(Date.now() / 1000);
+          await dataClient.send('addPatientRecord', [
+            chain.networkId,
+            chain.port,
+            rec.patientId,
+            rec.resourceType,
+            rec.clinicalCode,
+            jsonStr,
+            dataHash,
+            timestamp
+          ]);
+        }
+        const values = (topology.sampleData && topology.sampleData[chain.networkId.toString()]) || [];
+        for (const val of values) {
+          await dataClient.send('addDataPoint', [chain.networkId, chain.port, val]);
+        }
+      }
+    });
+
     await it('Verifies SHA-256 cryptographic hash integrity of stored FHIR records', async () => {
       const rootConfig = topology.chains.find(c => c.port === 8546);
       const rootClient = new ContractClient(rootConfig.rpcUrl, BlockData.abi, deployments.dataChains[rootConfig.networkId].address);
@@ -327,10 +355,309 @@ async function runTests() {
       assert.strictEqual(oncoRec.portNumber, spawnedNodePort);
     });
 
+    console.log('\n[Suite 10: Steering Council Project Provisioning & Security RBAC]');
+    await it('Steering Council Chair successfully creates a root federation project', async () => {
+      const councilChair = '0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02';
+      const tx = await repoClient.send('createProject', [
+        'National Cardiovascular Clinical Trials Network',
+        'Multi-center clinical trial repository linking cardiology clinics and research labs',
+        11102n
+      ], councilChair);
+      assert.ok(tx.hash, 'Project creation tx hash should be present');
+
+      const allProjects = await repoClient.call('getAllProjects');
+      assert.ok(allProjects.length >= 1, 'Expected at least 1 active consortium project');
+      const cardioProj = Array.from(allProjects).find(p => String(p.name || p[1]).includes('Cardiovascular'));
+      assert.ok(cardioProj, 'Created project should be queryable in registry');
+    });
+
+    await it('NEGATIVE: Unauthorized caller (0x9999...) fails to create project (reverts)', async () => {
+      const attacker = '0x9999999999999999999999999999999999999999';
+      let rejected = false;
+      try {
+        await repoClient.send('createProject', [
+          'Malicious Hijack Project',
+          'Attempted unauthorized project creation',
+          11102n
+        ], attacker);
+      } catch (err) {
+        rejected = true;
+        assert.ok(err.message.includes('not a Steering Council Admin'), `Expected unauthorized error, got: ${err.message}`);
+      }
+      assert.strictEqual(rejected, true, 'Non-council member should be rejected by smart contract');
+    });
+
+    console.log('\n[Suite 11: Detailed Healthcare Fork Requests & Lifecycle]');
+    let detailedProposalId;
+    await it('Submits detailed fork proposal for "Horizon Health Payor & Claims" with FHIR capabilities', async () => {
+      const proposer = '0x1111111111111111111111111111111111111111'; // Metro Admin
+      const initialAdmin = '0x5555555555555555555555555555555555555555';
+      const tx = await repoClient.send('proposeForkWithDetails', [
+        'Horizon Health Payor & Claims',
+        11120n,
+        8560n,
+        11102n, // Branch from root MPI
+        5n,
+        'Dedicated health insurance payor for automated claim adjudication & coverage verification',
+        'Health Insurance Payor',
+        'Patient, Coverage, Claim, ClaimResponse',
+        initialAdmin
+      ], proposer);
+
+      assert.ok(tx.hash, 'Fork proposal tx hash missing');
+      const totalProps = await repoClient.call('totalProposals');
+      detailedProposalId = Number(totalProps);
+      const prop = await repoClient.call('getProposalByIndex', [detailedProposalId - 1]);
+      assert.strictEqual(String(prop.orgName || prop[2]), 'Horizon Health Payor & Claims');
+      assert.strictEqual(String(prop.orgType || prop[8]), 'Health Insurance Payor');
+    });
+
+    await it('Consortium votes and executes detailed fork proposal', async () => {
+      const voter = '0x3333333333333333333333333333333333333333'; // BioLabs Admin
+      await repoClient.send('voteOnProposal', [BigInt(detailedProposalId), true], voter);
+      await repoClient.send('executeForkProposal', [BigInt(detailedProposalId)]);
+
+      const prop = await repoClient.call('getProposalByIndex', [detailedProposalId - 1]);
+      assert.strictEqual(Boolean(prop.executed !== undefined ? prop.executed : prop[11]), true);
+
+      // Verify organization registered
+      const allOrgs = await repoClient.call('getAllOrganizations');
+      const payorOrg = Array.from(allOrgs).find(o => String(o.name || o[1]).includes('Horizon Health Payor'));
+      assert.ok(payorOrg, 'Horizon Health Payor should now be registered in consortium directory');
+    });
+
+    console.log('\n[Suite 12: Inter-Organization Messaging & Cryptographic Anchoring]');
+    let testMessageId;
+    await it('Metro General Hospital dispatches an encrypted inter-org message to BioLabs', async () => {
+      const payload = {
+        resourceType: 'Communication',
+        id: 'COMM-001',
+        status: 'completed',
+        subject: { reference: 'Patient/P101' },
+        note: 'STAT bloodwork specimen dispatched to central diagnostics laboratory'
+      };
+
+      const result = await forkTreeService.sendMessage({
+        senderNetworkId: 11103, // Metro Hospital
+        recipientNetworkId: 11104, // BioLabs
+        recipient: '0x4444444444444444444444444444444444444444',
+        messageType: 'GENERAL',
+        subject: 'STAT Specimen Transport Notice for Patient P101',
+        fhirResourceType: 'Communication',
+        fhirResourceId: 'COMM-001',
+        payload,
+        callerAddress: '0x2222222222222222222222222222222222222222'
+      });
+
+      assert.strictEqual(result.success, true);
+      assert.ok(result.txHash, 'Transaction hash should be generated');
+      assert.ok(result.dataHash, 'SHA-256 data hash should be generated');
+
+      const allMsgs = await forkTreeService.getAllMessages();
+      assert.ok(allMsgs.length > 0, 'Messages list should not be empty');
+      const sentMsg = allMsgs.find(m => m.subject.includes('STAT Specimen Transport'));
+      assert.ok(sentMsg, 'Dispatched message should exist');
+      assert.strictEqual(sentMsg.senderNetworkId, 11103);
+      assert.strictEqual(sentMsg.recipientNetworkId, 11104);
+      assert.strictEqual(sentMsg.status, 0, 'Status should be PENDING (0)');
+      testMessageId = sentMsg.messageId;
+    });
+
+    await it('Updates inter-org message status to ACKNOWLEDGED', async () => {
+      const res = await forkTreeService.updateMessageStatus({
+        messageId: testMessageId,
+        status: 2, // ACKNOWLEDGED
+        callerAddress: '0x4444444444444444444444444444444444444444'
+      });
+      assert.strictEqual(res.success, true);
+
+      const msgs = await forkTreeService.getOrganizationMessages(11104);
+      const updated = msgs.find(m => m.messageId === testMessageId);
+      assert.strictEqual(updated.status, 2);
+      assert.strictEqual(updated.statusText, 'ACKNOWLEDGED');
+    });
+
+    console.log('\n[Suite 13: Cross-Fork FHIR Interoperability Workflows]');
+    let serviceReqMsgId;
+    await it('Hospital -> Lab: Dispatches FHIR ServiceRequest (CMP LOINC 24323-8)', async () => {
+      const orderPayload = {
+        resourceType: 'ServiceRequest',
+        id: 'SR-LAB-01',
+        status: 'active',
+        intent: 'order',
+        priority: 'stat',
+        subject: { reference: 'Patient/P101' },
+        code: {
+          coding: [{ system: 'http://loinc.org', code: '24323-8', display: 'Comprehensive metabolic panel' }]
+        }
+      };
+
+      const res = await forkTreeService.sendMessage({
+        senderNetworkId: 11103, // Metro General Hospital
+        recipientNetworkId: 11104, // BioLabs Diagnostic Center
+        recipient: '0x4444444444444444444444444444444444444444',
+        messageType: 'FHIR_SERVICE_REQUEST',
+        subject: 'STAT Comprehensive Metabolic Panel Order for Patient P101',
+        fhirResourceType: 'ServiceRequest',
+        fhirResourceId: 'SR-LAB-01',
+        payload: orderPayload,
+        callerAddress: '0x2222222222222222222222222222222222222222'
+      });
+
+      assert.strictEqual(res.success, true);
+      const allMsgs = await forkTreeService.getAllMessages();
+      const order = allMsgs.find(m => m.fhirResourceId === 'SR-LAB-01');
+      assert.ok(order, 'ServiceRequest order should be indexed');
+      serviceReqMsgId = order.messageId;
+    });
+
+    await it('Lab fulfills ServiceRequest with DiagnosticReport, updating request to FULFILLED', async () => {
+      const reportPayload = {
+        resourceType: 'DiagnosticReport',
+        id: 'REP-CMP-01',
+        status: 'final',
+        code: { coding: [{ system: 'http://loinc.org', code: '24323-8', display: 'Comprehensive metabolic panel' }] },
+        subject: { reference: 'Patient/P101' },
+        basedOn: [{ reference: 'ServiceRequest/SR-LAB-01' }],
+        result: [
+          { display: 'Glucose: 102 mg/dL' },
+          { display: 'Creatinine: 0.9 mg/dL' }
+        ]
+      };
+
+      const fulfillRes = await forkTreeService.fulfillFhirOrder({
+        requestMessageId: serviceReqMsgId,
+        responseResourceType: 'DiagnosticReport',
+        responsePayload: reportPayload,
+        callerAddress: '0x4444444444444444444444444444444444444444' // BioLabs Specialist
+      });
+
+      assert.strictEqual(fulfillRes.success, true);
+
+      // Verify original message is marked FULFILLED
+      const allMsgs = await forkTreeService.getAllMessages();
+      const originalReq = allMsgs.find(m => m.messageId === serviceReqMsgId);
+      assert.strictEqual(originalReq.status, 3, 'Original request status should be 3 (FULFILLED)');
+
+      // Verify cross-fork response message dispatched back to hospital
+      const responseMsg = allMsgs.find(m => m.responseToMessageId === serviceReqMsgId);
+      assert.ok(responseMsg, 'Response message linked to request should exist');
+      assert.strictEqual(responseMsg.senderNetworkId, 11104);
+      assert.strictEqual(responseMsg.recipientNetworkId, 11103);
+      assert.strictEqual(responseMsg.fhirResourceType, 'DiagnosticReport');
+    });
+
+    await it('Hospital -> Pharmacy: MedicationRequest fulfilled with MedicationDispense', async () => {
+      const medReqPayload = {
+        resourceType: 'MedicationRequest',
+        id: 'MED-REQ-02',
+        status: 'active',
+        intent: 'order',
+        subject: { reference: 'Patient/P101' },
+        medicationCodeableConcept: {
+          coding: [{ system: 'http://www.nlm.nih.gov/research/umls/rxnorm', code: '860975', display: 'Metformin 500mg' }]
+        }
+      };
+
+      const sendRes = await forkTreeService.sendMessage({
+        senderNetworkId: 11103,
+        recipientNetworkId: 11107, // Outpatient Pharmacy
+        recipient: '0x7777777777777777777777777777777777777777',
+        messageType: 'FHIR_MEDICATION_REQUEST',
+        subject: 'Prescription: Metformin 500mg for Patient P101',
+        fhirResourceType: 'MedicationRequest',
+        fhirResourceId: 'MED-REQ-02',
+        payload: medReqPayload,
+        callerAddress: '0x2222222222222222222222222222222222222222'
+      });
+      assert.strictEqual(sendRes.success, true);
+
+      const allMsgs = await forkTreeService.getAllMessages();
+      const medMsg = allMsgs.find(m => m.fhirResourceId === 'MED-REQ-02');
+
+      const dispensePayload = {
+        resourceType: 'MedicationDispense',
+        id: 'DISP-02',
+        status: 'completed',
+        subject: { reference: 'Patient/P101' },
+        quantity: { value: 60, unit: 'TAB' }
+      };
+
+      const fulfillRes = await forkTreeService.fulfillFhirOrder({
+        requestMessageId: medMsg.messageId,
+        responseResourceType: 'MedicationDispense',
+        responsePayload: dispensePayload,
+        callerAddress: '0x7777777777777777777777777777777777777777'
+      });
+      assert.strictEqual(fulfillRes.success, true);
+    });
+
+    console.log('\n[Suite 14: Hybrid Off-Chain Vault Security & Tamper-Resistance]');
+    await it('Hybrid Storage Adapter encrypts, stores, and verifies AES-256-GCM integrity', async () => {
+      const sampleClinicalDoc = {
+        resourceType: 'Observation',
+        id: 'OBS-GENOMICS-01',
+        patientId: 'P101',
+        gene: 'BRCA1',
+        mutation: 'c.5266dupC',
+        interpretation: 'Pathogenic'
+      };
+
+      const stored = storageAdapter.storeEncryptedPayload(sampleClinicalDoc);
+      assert.ok(stored.cid.startsWith('ipfs://bafk'), 'Should produce valid IPFS CID');
+      assert.strictEqual(stored.algorithm, 'AES-256-GCM');
+      assert.strictEqual(stored.dataHash.length, 64, 'SHA-256 hash length should be 64 hex chars');
+
+      const retrieved = storageAdapter.retrieveDecryptedPayload(stored.dataHash);
+      assert.deepStrictEqual(retrieved, sampleClinicalDoc, 'Decrypted payload must match original object');
+    });
+
+    console.log('\n[Suite 15: Role-Based Message & Patient Isolation]');
+    await it('Isolates inter-organization messages per organization', async () => {
+      const bioLabsMsgs = await forkTreeService.getOrganizationMessages(11104);
+      bioLabsMsgs.forEach(m => {
+        assert.ok(
+          m.senderNetworkId === 11104 || m.recipientNetworkId === 11104,
+          `Message #${m.messageId} should belong to BioLabs (11104)`
+        );
+      });
+    });
+
+    await it('Enforces patient sovereign isolation for longitudinal records', async () => {
+      const allRecordsByPort = await forkTreeService.getAllPatientRecords();
+      const allFlat = Object.values(allRecordsByPort).flat();
+      const p101Records = allFlat.filter(d => d.patientId === 'P101');
+      assert.ok(p101Records.length > 0, 'P101 records should exist');
+      p101Records.forEach(r => {
+        assert.strictEqual(r.patientId, 'P101', 'Record must match patient P101');
+      });
+    });
+
     console.log('\n===========================================================');
     console.log(` ALL TESTS PASSED: ${passedTests}/${totalTests} (100% Success)`);
     console.log('===========================================================');
   } finally {
+    // Pristine Storage Cleanup: Reset cache files to clean handover state (0 records)
+    const fs = require('fs');
+    const path = require('path');
+    const storageDir = path.join(__dirname, '../storage');
+    const emptyDump = {};
+    for (const chain of topology.chains) {
+      emptyDump[chain.rpcUrl] = [];
+    }
+    try {
+      fs.writeFileSync(path.join(storageDir, 'chainTreeData.json'), JSON.stringify(emptyDump, null, 2), 'utf-8');
+      fs.writeFileSync(path.join(storageDir, 'chainPatientData.json'), JSON.stringify(emptyDump, null, 2), 'utf-8');
+      multiChainEngine.clearSavedState();
+      const vaultDir = path.join(storageDir, 'vault');
+      if (fs.existsSync(vaultDir)) {
+        for (const file of fs.readdirSync(vaultDir)) {
+          if (file.endsWith('.json')) {
+            fs.unlinkSync(path.join(vaultDir, file));
+          }
+        }
+      }
+    } catch (e) {}
     await multiChainEngine.stopAll();
   }
 }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BlockchainForkTree: Shared Consortium Governance & EHR Platform</title>
+  <title>BlockchainForkTree: Enterprise Consortium Federation</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,71 +16,549 @@
       <div class="header-brand">
         <div class="logo-icon">🌿</div>
         <div>
-          <h1>BlockchainForkTree <span class="header-tag">Consortium Governance</span></h1>
-          <p class="subtitle">Multi-Chain Healthcare Federation, Stakeholder RBAC & Cross-Chain Longitudinal EHR</p>
+          <h1>BlockchainForkTree <span class="header-tag">Enterprise Federation</span></h1>
+          <p class="subtitle">Multi-Chain Healthcare Federation, Cross-Fork FHIR Interoperability & Strict RBAC Isolation</p>
         </div>
       </div>
       
-      <!-- Stakeholder Persona Switcher -->
+      <!-- Stakeholder Persona Switcher & Identity Bar -->
       <div class="persona-switcher-wrapper">
-        <div class="persona-icon-display" id="persona-avatar">🩺</div>
+        <div class="persona-icon-display" id="persona-avatar">🏛️</div>
         <div class="persona-details">
           <div class="persona-top-row">
-            <span class="persona-title-label">Active Stakeholder:</span>
-            <select id="persona-select" class="persona-dropdown">
-              <option value="metro-clinician">Dr. Alice Smith (Metro Clinician)</option>
-              <option value="metro-admin">Dr. Arthur Vance (Metro Hospital Admin)</option>
-              <option value="biolabs-admin">Marcus Sterling (BioLabs Admin)</option>
-              <option value="biolabs-specialist">Bob Martinez (BioLabs Lab Specialist)</option>
-              <option value="cardio-specialist">Dr. Carol Lin (Cardiology Specialist)</option>
-              <option value="emergency-physician">Dr. Dave Ross (ER Physician)</option>
-              <option value="consortium-auditor">Elena Rostova (Consortium Auditor)</option>
-              <option value="patient-p101">Johnathan Doe (Patient P101)</option>
-            </select>
+            <span class="persona-title-label">Logged-In Stakeholder:</span>
+            <select id="persona-select" class="persona-dropdown"></select>
           </div>
           <div class="persona-meta-row">
-            <span id="persona-badge" class="badge badge-role">CLINICIAN</span>
-            <span id="persona-org" class="persona-org-text">Metro General Hospital (:8547)</span>
-            <span id="persona-address" class="persona-address-mono">0x2222...2222</span>
+            <span id="persona-badge" class="badge badge-role">STEERING_COUNCIL</span>
+            <span id="persona-org" class="persona-org-text">Consortium Steering Council</span>
+            <span id="persona-address" class="persona-address-mono">0x163f...8d02</span>
           </div>
         </div>
       </div>
 
       <div class="header-actions">
-        <div class="status-indicator">
-          <span class="status-dot pulsing"></span>
-          <span id="global-status">Consortium Active</span>
-        </div>
-        <button id="btn-reseed" class="btn btn-outline btn-sm" title="Reset all chains, redeploy contracts, and re-seed sample data">
-          ↺ Reset & Reseed
+        <button id="btn-open-register-modal" class="btn btn-outline btn-sm" title="Register a new stakeholder or administrator">
+          ➕ Register Stakeholder
         </button>
       </div>
     </header>
 
-    <!-- Navigation Tabs -->
-    <nav class="nav-tabs">
-      <button class="tab-btn active" data-tab="tree">
-        <span class="tab-icon">🌳</span> Fork Tree Topology
+    <!-- Role Authorization Banner -->
+    <div id="auth-status-banner" class="auth-status-banner">
+      <div class="auth-banner-content">
+        <span class="auth-banner-icon" id="auth-banner-icon">🛡️</span>
+        <span id="auth-banner-text">Loading permissions...</span>
+      </div>
+      <div class="auth-banner-badges">
+        <span class="badge badge-outline" id="vault-stats-badge">Off-Chain Vault: Ready</span>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs (Role-Gated) -->
+    <nav class="nav-tabs" id="main-nav-tabs">
+      <button class="tab-btn" data-tab="roles" data-roles="STEERING_COUNCIL,ORG_ADMIN">
+        <span class="tab-icon">👥</span> Roles & Projects
       </button>
-      <button class="tab-btn" data-tab="governance">
-        <span class="tab-icon">🏛️</span> Shared Governance
+      <button class="tab-btn" data-tab="messaging" data-roles="CLINICIAN,SPECIALIST,ORG_ADMIN">
+        <span class="tab-icon">📨</span> FHIR Gateway
       </button>
-      <button class="tab-btn" data-tab="nodes">
-        <span class="tab-icon">⚡</span> Organizations & Nodes
+      <button class="tab-btn" data-tab="data" data-roles="CLINICIAN,SPECIALIST,AUDITOR,PATIENT">
+        <span class="tab-icon">🩺</span> Longitudinal EHR
       </button>
-      <button class="tab-btn" data-tab="data">
-        <span class="tab-icon">🩺</span> Longitudinal EHR Explorer
+      <button class="tab-btn" data-tab="request-fork" data-roles="ORG_ADMIN,STEERING_COUNCIL">
+        <span class="tab-icon">🌿</span> Request Fork
       </button>
-      <button class="tab-btn" data-tab="search">
-        <span class="tab-icon">🔍</span> Multi-Chain Search (DFS / BFS)
+      <button class="tab-btn" data-tab="governance" data-roles="STEERING_COUNCIL,ORG_ADMIN,AUDITOR">
+        <span class="tab-icon">🏛️</span> Governance
       </button>
-      <button class="tab-btn" data-tab="create-fork">
-        <span class="tab-icon">➕</span> Spin Up Fork
+      <button class="tab-btn" data-tab="search" data-roles="CLINICIAN,SPECIALIST,AUDITOR">
+        <span class="tab-icon">🔍</span> Multi-Chain Search
+      </button>
+      <button class="tab-btn" data-tab="tree" data-roles="STEERING_COUNCIL,ORG_ADMIN,AUDITOR">
+        <span class="tab-icon">🌳</span> Fork Tree
+      </button>
+      <button class="tab-btn" data-tab="nodes" data-roles="STEERING_COUNCIL,ORG_ADMIN,AUDITOR">
+        <span class="tab-icon">⚡</span> Nodes Status
+      </button>
+      <button class="tab-btn" data-tab="create-fork" data-roles="STEERING_COUNCIL">
+        <span class="tab-icon">➕</span> Direct Spawner
       </button>
     </nav>
 
-    <!-- TAB 1: Tree Topology -->
-    <section id="tab-tree" class="tab-content active">
+    <!-- TAB: Roles & Projects (Steering Council & Org Admin) -->
+    <section id="tab-roles" class="tab-content">
+      <div class="grid-2-col">
+        <!-- Active User Profile & Permissions -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>Stakeholder Profile & Credentials</h3>
+              <p class="card-subtitle">Cryptographic identity and authorized role permissions</p>
+            </div>
+            <span id="profile-role-badge" class="badge badge-role">STEERING_COUNCIL</span>
+          </div>
+          <div class="card-body">
+            <div class="profile-card">
+              <div class="profile-avatar-large" id="profile-avatar-large">🏛️</div>
+              <div class="profile-info-grid">
+                <div class="profile-field">
+                  <span class="field-label">Name:</span>
+                  <span class="field-value font-bold" id="profile-name">Dr. Marcus Vance</span>
+                </div>
+                <div class="profile-field">
+                  <span class="field-label">Title:</span>
+                  <span class="field-value" id="profile-title">Consortium Steering Council Chair</span>
+                </div>
+                <div class="profile-field">
+                  <span class="field-label">Affiliated Org:</span>
+                  <span class="field-value" id="profile-org">Consortium Steering Council</span>
+                </div>
+                <div class="profile-field">
+                  <span class="field-label">Wallet Address:</span>
+                  <span class="field-value font-mono" id="profile-address">0x163f...8d02</span>
+                </div>
+                <div class="profile-field full-width">
+                  <span class="field-label">Granted Permissions:</span>
+                  <div class="tags-container" id="profile-permissions-list"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="quick-switch-section">
+              <h4>Switch Active Role / User:</h4>
+              <div class="persona-chips-grid" id="persona-chips-grid"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Steering Council Console (Visible ONLY to Steering Council) -->
+        <div class="card" id="steering-council-console-card">
+          <div class="card-header">
+            <div>
+              <h3>Steering Council Project Management</h3>
+              <p class="card-subtitle">Global federation root authority & anchor project provisioning</p>
+            </div>
+            <span class="badge badge-warning">Council Authority</span>
+          </div>
+          <div class="card-body">
+            <form id="form-create-project">
+              <div class="form-group">
+                <label for="project-name">Federation Project Name:</label>
+                <input type="text" id="project-name" class="form-control" placeholder="e.g. National Healthcare Interoperability Network" required>
+              </div>
+              <div class="form-group">
+                <label for="project-desc">Scope & Data Governance Boundaries:</label>
+                <textarea id="project-desc" class="form-control" rows="2" placeholder="Define shared clinical protocols, participant eligibility, and interoperability mandates..." required></textarea>
+              </div>
+              <div class="form-group">
+                <label for="project-root-net">Anchor Root Blockchain:</label>
+                <select id="project-root-net" class="form-control">
+                  <option value="11102">Chain 11102 - Master Patient Index (MPI Root)</option>
+                  <option value="11101">Chain 11101 - Consortium Governance Hub</option>
+                </select>
+              </div>
+              <button type="submit" id="btn-submit-project" class="btn btn-primary btn-block">
+                🏛️ Provision New Federation Project
+              </button>
+            </form>
+
+            <div class="projects-list-section">
+              <h4>Active Consortium Projects:</h4>
+              <div id="projects-container" class="projects-container">
+                <div class="empty-state">No projects created yet. Use the form above to provision the first federation project.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: Longitudinal EHR Explorer (Clinicians, Specialists, Auditors, Patients) -->
+    <section id="tab-data" class="tab-content">
+      <!-- Author Clinical Record Card (Visible ONLY to Clinicians) -->
+      <div class="card" id="author-record-card" style="margin-bottom: 20px;">
+        <div class="card-header">
+          <div>
+            <h3>Author Real HL7 FHIR Patient Record</h3>
+            <p class="card-subtitle">Digitally sign and commit clinical encounter or observation to blockchain ledger</p>
+          </div>
+          <span class="badge badge-success">Clinician Portal</span>
+        </div>
+        <div class="card-body">
+          <form id="form-add-clinical-record">
+            <div class="form-row-3">
+              <div class="form-group">
+                <label for="rec-target-port">Target Care Blockchain:</label>
+                <select id="rec-target-port" class="form-control" required></select>
+              </div>
+              <div class="form-group">
+                <label for="rec-patient-id">Patient ID / MRN:</label>
+                <input type="text" id="rec-patient-id" class="form-control" placeholder="e.g. P101 or MRN-90210" required>
+              </div>
+              <div class="form-group">
+                <label for="rec-resource-type">FHIR Resource Type:</label>
+                <select id="rec-resource-type" class="form-control" required>
+                  <option value="Encounter">Encounter (Inpatient / Outpatient Visit)</option>
+                  <option value="Observation">Observation (Vital Signs / Lab Test)</option>
+                  <option value="Condition">Condition (Problem / Clinical Diagnosis)</option>
+                  <option value="DiagnosticReport">DiagnosticReport (Lab / Pathology Results)</option>
+                  <option value="MedicationRequest">MedicationRequest (Prescription)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="rec-clinical-code">Clinical Coding (LOINC / ICD-10 / SNOMED):</label>
+                <input type="text" id="rec-clinical-code" class="form-control" placeholder="e.g. LOINC:24323-8 or ICD-10:E11.9" required>
+              </div>
+              <div class="form-group">
+                <label for="rec-summary-note">Clinical Findings / Observation Value:</label>
+                <input type="text" id="rec-summary-note" class="form-control" placeholder="e.g. Blood Glucose 104 mg/dL. Reference 70-99." required>
+              </div>
+            </div>
+
+            <button type="submit" id="btn-commit-record" class="btn btn-primary">
+              🔒 Commit Record with Clinician Signature
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Patient Consent Management Card (Visible to Patients) -->
+      <div class="card" id="patient-consent-card" style="display: none; margin-bottom: 20px;">
+        <div class="card-header">
+          <div>
+            <h3>Patient Consent & Cross-Organization Access Controls</h3>
+            <p class="card-subtitle">Manage which healthcare facilities can query your health records</p>
+          </div>
+          <span class="badge badge-info">HIPAA Consent Registry</span>
+        </div>
+        <div class="card-body">
+          <p class="section-desc">You have sovereign control over your records. Grant or revoke cross-facility data sharing below:</p>
+          <div id="patient-consent-list" class="tags-container"></div>
+        </div>
+      </div>
+
+      <!-- Records Explorer Card -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3 id="ehr-records-title">Longitudinal Health Record Explorer</h3>
+            <p class="card-subtitle" id="ehr-records-subtitle">Cryptographically anchored records with SHA-256 integrity verification</p>
+          </div>
+          <div class="header-filters">
+            <select id="data-chain-select" class="form-control form-control-sm">
+              <option value="all">All Authorized Care Sites</option>
+            </select>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="patient-data-container" class="patient-data-container">
+            <div class="empty-state">
+              <span style="font-size: 2rem; display: block; margin-bottom: 0.5rem;">🩺</span>
+              No clinical records found. Clinicians can author and commit the first patient record using the form above.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: FHIR Gateway & Inter-Org Messages (Clinicians, Specialists, Org Admins) -->
+    <section id="tab-messaging" class="tab-content">
+      <div class="messaging-layout">
+        <!-- Stats Row -->
+        <div class="messaging-stats-row">
+          <div class="stat-pill">
+            <span class="stat-pill-label">Total Messages</span>
+            <span class="stat-pill-val" id="stat-total-messages">0</span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-pill-label">Pending Orders</span>
+            <span class="stat-pill-val color-warning" id="stat-pending-orders">0</span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-pill-label">Fulfilled Orders</span>
+            <span class="stat-pill-val color-success" id="stat-fulfilled-orders">0</span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-pill-label">Vault Encrypted CIDs</span>
+            <span class="stat-pill-val" id="stat-vault-docs">0</span>
+          </div>
+          <div class="messaging-filter-controls">
+            <label for="msg-filter-org">Scope Org:</label>
+            <select id="msg-filter-org" class="form-control form-control-sm">
+              <option value="all">My Organization</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid-2-col">
+          <!-- Messages List -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h3>Inter-Organization Message Stream</h3>
+                <p class="card-subtitle">Verifiable cross-fork HL7 FHIR communications</p>
+              </div>
+              <button id="btn-open-compose" class="btn btn-primary btn-sm">
+                ✏️ Compose Order
+              </button>
+            </div>
+            <div class="card-body">
+              <div class="filter-pills-row">
+                <button class="filter-pill active" data-msg-filter="all">All Messages</button>
+                <button class="filter-pill" data-msg-filter="orders">Clinical Orders</button>
+                <button class="filter-pill" data-msg-filter="pending">Pending</button>
+                <button class="filter-pill" data-msg-filter="fulfilled">Fulfilled</button>
+              </div>
+              <div id="messages-list-container" class="messages-list-container">
+                <div class="empty-state">No messages in stream. Click "Compose Order" to dispatch a new cross-fork FHIR transmission.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Message Detail Inspector -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h3 id="msg-detail-title">Message Inspector</h3>
+                <p class="card-subtitle" id="msg-detail-subtitle">Select any transmission to view FHIR payload & cryptographic proofs</p>
+              </div>
+              <span id="msg-detail-status-badge" class="badge badge-secondary">No Selection</span>
+            </div>
+            <div class="card-body" id="msg-detail-body">
+              <div class="empty-state">
+                <span style="font-size: 2.5rem; display: block; margin-bottom: 0.5rem;">📨</span>
+                Select any message or clinical order from the list on the left to inspect its FHIR resource, SHA-256 digest, and fulfill pending requests.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Compose Message / FHIR Order Panel -->
+        <div class="card compose-message-card" id="compose-message-panel" style="display: none;">
+          <div class="card-header">
+            <div>
+              <h3>Dispatch Cross-Fork HL7 FHIR Transmission</h3>
+              <p class="card-subtitle">Initiate a verifiable healthcare order with off-chain encryption and on-chain hash anchoring</p>
+            </div>
+            <button id="btn-close-compose" class="btn btn-outline btn-sm">&times; Close</button>
+          </div>
+          <div class="card-body">
+            <form id="form-compose-message">
+              <div class="form-row-3">
+                <div class="form-group">
+                  <label for="compose-recipient-net">Recipient Healthcare Entity:</label>
+                  <select id="compose-recipient-net" class="form-control" required></select>
+                </div>
+                <div class="form-group">
+                  <label for="compose-msg-type">Transmission / Order Type:</label>
+                  <select id="compose-msg-type" class="form-control" required>
+                    <option value="FHIR_SERVICE_REQUEST">FHIR ServiceRequest (Lab Order: CMP / Chem Panel)</option>
+                    <option value="FHIR_MEDICATION_REQUEST">FHIR MedicationRequest (Prescription: Metformin / Rx)</option>
+                    <option value="FHIR_CLAIM">FHIR Claim (Insurance Billing / Prior Auth)</option>
+                    <option value="GENERAL">General Inter-Org Communication</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="compose-patient-id">Patient ID:</label>
+                  <input type="text" id="compose-patient-id" class="form-control" placeholder="e.g. P101" required>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="compose-subject">Subject / Clinical Purpose:</label>
+                <input type="text" id="compose-subject" class="form-control" placeholder="e.g. STAT Routine Comprehensive Metabolic Panel (CMP)" required>
+              </div>
+
+              <div class="form-group">
+                <div class="json-header-row">
+                  <label for="compose-payload">HL7 FHIR R4 JSON Body (AES-256-GCM Encrypted & Hash Anchored):</label>
+                  <button type="button" id="btn-reset-template" class="btn btn-xs btn-outline">↺ Reset Template</button>
+                </div>
+                <textarea id="compose-payload" class="form-control font-mono" rows="8" required></textarea>
+              </div>
+
+              <div class="form-actions-right">
+                <button type="button" id="btn-cancel-compose" class="btn btn-outline">Cancel</button>
+                <button type="submit" id="btn-send-message" class="btn btn-primary">
+                  🚀 Sign & Dispatch Verifiable Transmission
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: Request Fork (Org Admins & Steering Council) -->
+    <section id="tab-request-fork" class="tab-content">
+      <div class="grid-2-col">
+        <!-- Fork Request Form -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>Submit Healthcare Fork Request</h3>
+              <p class="card-subtitle">Request a specialized branch blockchain for a hospital, payor, lab, or clinic</p>
+            </div>
+            <span class="badge badge-primary">Consortium Proposal</span>
+          </div>
+          <div class="card-body">
+            <form id="form-request-fork">
+              <div class="form-group">
+                <label for="req-org-name">Organization / Clinic Name:</label>
+                <input type="text" id="req-org-name" class="form-control" placeholder="e.g. Horizon Health Payor & Claims" required>
+              </div>
+
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="req-org-type">Healthcare Archetype:</label>
+                  <select id="req-org-type" class="form-control" required>
+                    <option value="Hospital Inpatient">Hospital / Health System</option>
+                    <option value="Health Insurance Payor">Health Insurance / Payor</option>
+                    <option value="Diagnostic Pathology">Diagnostic Laboratory</option>
+                    <option value="Outpatient Pharmacy">Pharmacy / Dispensary</option>
+                    <option value="Specialty Clinic">Specialty Clinic / Outpatient</option>
+                    <option value="Research Institute">Academic / Clinical Research</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="req-parent-net">Parent Chain to Branch From:</label>
+                  <select id="req-parent-net" class="form-control" required></select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="req-justification">Clinical & Operational Justification:</label>
+                <textarea id="req-justification" class="form-control" rows="2" placeholder="Describe the legal entity, clinical mission, and purpose of operating a dedicated fork..." required></textarea>
+              </div>
+
+              <div class="form-group">
+                <label for="req-fhir-capability">Supported FHIR Resources:</label>
+                <input type="text" id="req-fhir-capability" class="form-control" value="Patient, Observation, Condition, ServiceRequest, DiagnosticReport" required>
+              </div>
+
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="req-admin-address">Designated Admin Wallet Address:</label>
+                  <input type="text" id="req-admin-address" class="form-control font-mono" placeholder="0x..." required>
+                </div>
+                <div class="form-group">
+                  <label for="req-fork-block">Parent Fork Block Height:</label>
+                  <input type="number" id="req-fork-block" class="form-control" value="0" min="0">
+                </div>
+              </div>
+
+              <button type="submit" id="btn-submit-fork-request" class="btn btn-primary btn-block">
+                🌿 Submit Fork Request to Consortium Ballot
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Active Ballots -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>Active Governance Ballots</h3>
+              <p class="card-subtitle">Member organizations vote on fork requests and topology changes</p>
+            </div>
+            <span id="ballot-count-badge" class="badge badge-success">0 Ballots</span>
+          </div>
+          <div class="card-body">
+            <div id="fork-ballots-container" class="proposals-list-container">
+              <div class="empty-state">No active governance ballots found. Submit a fork request using the form on the left.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: Shared Governance Directory -->
+    <section id="tab-governance" class="tab-content">
+      <div class="grid-2-col">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>Consortium Member Organizations</h3>
+              <p class="card-subtitle">Registered healthcare entities with on-chain voting rights</p>
+            </div>
+            <span class="badge badge-success" id="org-count-badge">Active</span>
+          </div>
+          <div class="card-body">
+            <div id="governance-orgs-list" class="orgs-directory-container">
+              <div class="empty-state">Loading member organizations...</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>Chain Stakeholders & RBAC Roles</h3>
+              <p class="card-subtitle">Contract-enforced administrative, clinical, and auditor roles</p>
+            </div>
+            <select id="stakeholder-chain-select" class="form-control form-control-sm" style="max-width: 200px;"></select>
+          </div>
+          <div class="card-body">
+            <div id="stakeholders-list-container" class="stakeholders-list-container">
+              <div class="empty-state">Select an organization to view authorized stakeholders.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: Multi-Chain Search -->
+    <section id="tab-search" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3>Multi-Chain Graph Traversal Search</h3>
+            <p class="card-subtitle">Reconstruct complete clinical histories across parent-child fork branches</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <form id="form-search" class="search-form-grid">
+            <div class="form-row-3" style="grid-column: 1 / -1;">
+              <div class="form-group">
+                <label for="search-algorithm">Traversal Strategy:</label>
+                <select id="search-algorithm" class="form-control">
+                  <option value="BFS">Breadth-First Search (BFS) - Level Order</option>
+                  <option value="DFS">Depth-First Search (DFS) - Branch Order</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="search-start-chain">Root / Starting Chain:</label>
+                <select id="search-start-chain" class="form-control"></select>
+              </div>
+              <div class="form-group">
+                <label for="search-value">Search Term (Patient ID / LOINC / Resource):</label>
+                <input type="text" id="search-value" class="form-control" placeholder="e.g. P101 or Observation" required>
+              </div>
+            </div>
+            <div class="form-group search-btn-group" style="grid-column: 1 / -1;">
+              <button type="submit" id="btn-run-search" class="btn btn-primary btn-block">
+                🔍 Execute Multi-Chain Traversal
+              </button>
+            </div>
+          </form>
+
+          <div id="search-results-section" class="search-results-section" style="display: none;">
+            <div class="search-summary-bar" id="search-summary-bar"></div>
+            <h4>Cross-Chain Traversal Path:</h4>
+            <div id="search-traversal-path" class="traversal-path-row"></div>
+            <h4>Longitudinal Clinical History Reconstructed:</h4>
+            <div id="search-longitudinal-timeline" class="longitudinal-timeline"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: Fork Tree Topology -->
+    <section id="tab-tree" class="tab-content">
       <div class="grid-2-col">
         <div class="card">
           <div class="card-header">
@@ -89,7 +567,7 @@
           </div>
           <div class="card-body">
             <p class="section-desc">
-              Visualizes the parent-child relationships among the consortium blockchains. Root chain <code>11102</code> (MPI) branches into specialized organizational forks.
+              Visualizes parent-child relationships among the consortium blockchains. Root chain <code>11102</code> branches into specialized organizational forks.
             </p>
             <div id="tree-canvas-container" class="tree-canvas-container">
               <svg id="tree-svg" width="100%" height="450"></svg>
@@ -99,36 +577,22 @@
 
         <div class="card">
           <div class="card-header">
-            <h3>Consortium & Security Architecture</h3>
-            <span class="badge badge-info">Decentralized Healthcare</span>
+            <h3>Healthcare Federation Infrastructure</h3>
+            <span class="badge badge-info">Decentralized</span>
           </div>
           <div class="card-body system-explainer">
             <div class="explainer-item">
               <div class="explainer-num">1</div>
               <div>
-                <h4>Shared Governance Chain (Port 8545 / Net 11101)</h4>
-                <p>Hosts <code>ConsortiumGovernance.sol</code>. Member organizations submit fork proposals, cast multi-stakeholder votes, and anchor the official parent-child federation topology.</p>
+                <h4>Steering Council & Shared Governance (Port 8545)</h4>
+                <p>Hosts <code>ConsortiumGovernance.sol</code>. Anchors the official parent-child federation topology, project definitions, and inter-org messaging.</p>
               </div>
             </div>
             <div class="explainer-item">
               <div class="explainer-num">2</div>
               <div>
                 <h4>Organization-Owned Blockchains (Ports 8546–8551+)</h4>
-                <p>Each hospital, lab, or clinic operates an independent blockchain governed by its own stakeholders with smart-contract enforced Role-Based Access Control (RBAC).</p>
-              </div>
-            </div>
-            <div class="explainer-item">
-              <div class="explainer-num">3</div>
-              <div>
-                <h4>Protected Health Information (PHI) & SHA-256 Digest</h4>
-                <p>Clinical resources are cryptographically hashed and digitally attributed. Only authorized clinicians can commit patient records to their organization ledger.</p>
-              </div>
-            </div>
-            <div class="explainer-item">
-              <div class="explainer-num">4</div>
-              <div>
-                <h4>Cross-Chain Longitudinal EHR Reconstruction</h4>
-                <p>Graph traversal algorithms (BFS/DFS) query authorized nodes in level-by-level or branch-by-branch order to reconstruct a unified clinical history.</p>
+                <p>Each hospital, lab, payor, or clinic operates an independent blockchain governed by smart-contract enforced Role-Based Access Control (RBAC).</p>
               </div>
             </div>
           </div>
@@ -136,331 +600,34 @@
       </div>
     </section>
 
-    <!-- TAB 2: Shared Governance (NEW) -->
-    <section id="tab-governance" class="tab-content">
-      <div class="grid-2-col">
-        <!-- Member Organizations Directory -->
-        <div class="card">
-          <div class="card-header">
-            <div>
-              <h3>Consortium Member Organizations</h3>
-              <p class="card-subtitle">Decentralized federation members with on-chain governance rights</p>
-            </div>
-            <span class="badge badge-success" id="org-count-badge">6 Organizations</span>
-          </div>
-          <div class="card-body">
-            <div class="table-responsive">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Org ID</th>
-                    <th>Organization Name</th>
-                    <th>Type</th>
-                    <th>Network ID</th>
-                    <th>Port</th>
-                    <th>Admin Address</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody id="governance-orgs-tbody">
-                  <tr><td colspan="7" class="loading-cell">Loading consortium members...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- Propose New Fork Form -->
-        <div class="card">
-          <div class="card-header">
-            <div>
-              <h3>Submit Fork / Organization Proposal</h3>
-              <p class="card-subtitle">Propose adding a new clinical blockchain branch to the consortium</p>
-            </div>
-            <span class="badge badge-primary">On-Chain Proposal</span>
-          </div>
-          <div class="card-body">
-            <form id="form-submit-proposal" class="governance-form">
-              <div class="form-group">
-                <label for="prop-org-name">Organization / Branch Name:</label>
-                <input type="text" id="prop-org-name" class="form-control" placeholder="e.g. Children's Health Specialty Clinic" required>
-              </div>
-              <div class="form-row">
-                <div class="form-group col-half">
-                  <label for="prop-parent-chain">Parent Blockchain to Fork:</label>
-                  <select id="prop-parent-chain" class="form-control" required>
-                    <!-- Populated dynamically -->
-                  </select>
-                </div>
-                <div class="form-group col-half">
-                  <label for="prop-org-type">Organization Type:</label>
-                  <select id="prop-org-type" class="form-control">
-                    <option value="Specialty Clinic">Specialty Clinic</option>
-                    <option value="Hospital Inpatient">Hospital Inpatient</option>
-                    <option value="Diagnostic Pathology">Diagnostic Pathology</option>
-                    <option value="Emergency Care">Emergency Care</option>
-                    <option value="Research & Genomics">Research & Genomics</option>
-                    <option value="Pharmacy Network">Pharmacy Network</option>
-                  </select>
-                </div>
-              </div>
-              <div class="form-group">
-                <label for="prop-justification">Clinical Justification & Governance Intent:</label>
-                <textarea id="prop-justification" class="form-control" rows="3" placeholder="Describe the clinical services, data privacy requirements, and justification for forking..." required></textarea>
-              </div>
-              <div class="governance-submit-row">
-                <div class="proposer-preview">
-                  <span class="small-label">Proposer Address:</span>
-                  <code id="prop-current-proposer" class="mono-code">0x1111...1111</code>
-                </div>
-                <button type="submit" id="btn-submit-proposal" class="btn btn-primary">
-                  📜 Submit Proposal to Consortium
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-
-      <!-- Active Proposals & Live Voting Panel -->
-      <div class="card mt-4">
-        <div class="card-header">
-          <div>
-            <h3>Consortium Governance Proposals & Voting</h3>
-            <p class="card-subtitle">Active and historical proposals requiring member consensus before node execution</p>
-          </div>
-          <button id="btn-refresh-proposals" class="btn btn-outline btn-sm">↻ Refresh Proposals</button>
-        </div>
-        <div class="card-body">
-          <div id="proposals-list-container" class="proposals-grid">
-            <div class="empty-state">Loading governance proposals...</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- TAB 3: Nodes Monitor -->
+    <!-- TAB: Nodes Status -->
     <section id="tab-nodes" class="tab-content">
       <div class="card">
         <div class="card-header">
-          <h3>Multi-Chain Consortium Infrastructure</h3>
-          <span class="badge badge-success">Live RPC Monitoring</span>
+          <div>
+            <h3>Consortium Blockchain Nodes Cluster</h3>
+            <p class="card-subtitle">Real-time status of independent Ethereum-compatible nodes</p>
+          </div>
+          <button id="btn-refresh-nodes" class="btn btn-outline btn-sm">↺ Refresh Nodes</button>
         </div>
         <div class="card-body">
           <div id="nodes-grid" class="nodes-grid">
-            <!-- Node cards injected via app.js -->
+            <div class="empty-state">Loading node cluster status...</div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- TAB 4: Data Explorer -->
-    <section id="tab-data" class="tab-content">
-      <!-- Authorization Status Alert Banner -->
-      <div id="auth-status-banner" class="auth-banner auth-allowed">
-        <span class="auth-icon">🛡️</span>
-        <div class="auth-text">
-          <strong id="auth-status-title">Authorized Clinician Access</strong>
-          <p id="auth-status-desc">You are operating as Dr. Alice Smith (Metro General Hospital). You have full authorization to commit patient records to Port 8547.</p>
-        </div>
-      </div>
-
-      <div class="grid-data-layout">
-        <!-- Records Table -->
-        <div class="card data-table-card">
-          <div class="card-header">
-            <div>
-              <h3>Consortium Electronic Health Records (HL7 FHIR)</h3>
-              <p class="card-subtitle">Cryptographically verified patient health records stored across forked organizational ledgers</p>
-            </div>
-            <div class="data-filters">
-              <select id="data-chain-filter" class="form-control form-control-sm">
-                <option value="all">All Organizations / Blockchains</option>
-              </select>
-              <button id="btn-refresh-data" class="btn btn-outline btn-sm">↻ Refresh</button>
-            </div>
-          </div>
-          <div class="card-body">
-            <div class="table-responsive">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Block #</th>
-                    <th>Organization / Blockchain</th>
-                    <th>Patient ID</th>
-                    <th>HL7 Resource</th>
-                    <th>Clinical Code</th>
-                    <th>SHA-256 Hash</th>
-                    <th>Recorded At</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="data-table-tbody">
-                  <tr><td colspan="8" class="loading-cell">Loading records...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- Add HL7 Record Form -->
-        <div class="card add-record-card">
-          <div class="card-header">
-            <h3>Add Patient Record (HL7 FHIR)</h3>
-            <span class="badge badge-secondary" id="write-perm-badge">🔒 RBAC Gated</span>
-          </div>
-          <div class="card-body">
-            <form id="form-add-patient-record">
-              <div class="form-group">
-                <label for="patient-chain-select">Target Blockchain (Organization):</label>
-                <select id="patient-chain-select" class="form-control" required>
-                  <!-- Injected via app.js -->
-                </select>
-                <small id="chain-auth-hint" class="form-hint">Checking stakeholder authorization...</small>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group col-half">
-                  <label for="patient-id-input">Patient ID / MRN:</label>
-                  <input type="text" id="patient-id-input" class="form-control" placeholder="e.g. P101" required>
-                </div>
-                <div class="form-group col-half">
-                  <label for="resource-type-select">Resource Type:</label>
-                  <select id="resource-type-select" class="form-control" required>
-                    <option value="Observation">Observation (Vitals/Labs)</option>
-                    <option value="Condition">Condition (Diagnosis)</option>
-                    <option value="Encounter">Encounter (Visit)</option>
-                    <option value="DiagnosticReport">DiagnosticReport (EKG/Pathology)</option>
-                    <option value="MedicationRequest">MedicationRequest (Rx)</option>
-                    <option value="Patient">Patient (Demographics)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label for="clinical-code-input">Clinical Code (LOINC / ICD-10 / RxNorm / CPT):</label>
-                <input type="text" id="clinical-code-input" class="form-control" placeholder="e.g. LOINC:15074-8 (Blood Glucose)" required>
-              </div>
-
-              <div class="form-group">
-                <label for="resource-data-input">HL7 FHIR Resource JSON Payload:</label>
-                <textarea id="resource-data-input" class="form-control code-font" rows="5" placeholder='{"resourceType": "Observation", "code": {"coding": [{"system": "http://loinc.org", "code": "15074-8"}]}, "valueQuantity": {"value": 140, "unit": "mg/dL"}}' required></textarea>
-              </div>
-
-              <button type="submit" id="btn-commit-record" class="btn btn-primary btn-block">
-                🔒 Commit Record with Clinician Credentials
-              </button>
-              <div id="add-record-result" class="add-result-msg"></div>
-            </form>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- TAB 5: Search -->
-    <section id="tab-search" class="tab-content">
-      <div class="search-layout">
-        <!-- Search Controls -->
-        <div class="card search-control-card">
-          <div class="card-header">
-            <div>
-              <h3>Cross-Chain Longitudinal EHR Reconstruction</h3>
-              <p class="card-subtitle">Traverse the organization fork tree using BFS or DFS algorithms</p>
-            </div>
-          </div>
-          <div class="card-body">
-            <form id="form-search">
-              <div class="search-algorithm-selector">
-                <label class="radio-card">
-                  <input type="radio" name="algorithm" value="BFS" checked>
-                  <div class="radio-card-content">
-                    <span class="algo-name">Breadth-First Search (BFS)</span>
-                    <span class="algo-desc">Level-by-level cross-organization traversal</span>
-                  </div>
-                </label>
-                <label class="radio-card">
-                  <input type="radio" name="algorithm" value="DFS">
-                  <div class="radio-card-content">
-                    <span class="algo-name">Depth-First Search (DFS)</span>
-                    <span class="algo-desc">Deep branch-by-branch clinic lineage traversal</span>
-                  </div>
-                </label>
-              </div>
-
-              <div class="search-input-row">
-                <div class="form-group col-quarter">
-                  <label for="search-query-type">Query Type:</label>
-                  <select id="search-query-type" class="form-control">
-                    <option value="patientId">Patient ID (e.g. P101)</option>
-                    <option value="resourceType">Resource Type</option>
-                    <option value="keyword">Diagnosis / Code</option>
-                    <option value="integer">Legacy Integer</option>
-                  </select>
-                </div>
-                <div class="form-group col-half">
-                  <label for="search-value-input">Search Query:</label>
-                  <input type="text" id="search-value-input" class="form-control form-control-lg" placeholder="Enter Patient ID (e.g., P101)..." value="P101" required>
-                </div>
-                <div class="form-group col-quarter search-btn-col">
-                  <button type="submit" id="btn-run-search" class="btn btn-primary btn-lg btn-block">
-                    🔍 Execute Traversal
-                  </button>
-                </div>
-              </div>
-
-              <div class="quick-search-chips">
-                <span class="chips-label">Quick Lookups:</span>
-                <button type="button" class="chip-btn" data-query="P101" data-type="patientId">👤 Patient P101 (All Clinics)</button>
-                <button type="button" class="chip-btn" data-query="Observation" data-type="resourceType">🧪 All Lab Observations</button>
-                <button type="button" class="chip-btn" data-query="E11.9" data-type="keyword">🩺 Type 2 Diabetes (E11.9)</button>
-                <button type="button" class="chip-btn" data-query="43" data-type="integer">🔢 Legacy Value 43</button>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <!-- Search Results View -->
-        <div id="search-results-section" class="search-results-section" style="display: none;">
-          <div class="grid-2-col">
-            <!-- Traversal Route -->
-            <div class="card">
-              <div class="card-header">
-                <h3>Tree Traversal Route</h3>
-                <span id="search-algo-badge" class="badge badge-primary">BFS Traversal</span>
-              </div>
-              <div class="card-body">
-                <div id="traversal-stats" class="traversal-stats"></div>
-                <div id="traversal-route-list" class="traversal-route-list"></div>
-              </div>
-            </div>
-
-            <!-- Longitudinal EHR Timeline -->
-            <div class="card">
-              <div class="card-header">
-                <h3>Longitudinal Patient EHR Timeline</h3>
-                <span id="search-matches-badge" class="badge badge-success">0 Events Found</span>
-              </div>
-              <div class="card-body">
-                <div id="ehr-timeline-container" class="ehr-timeline-container">
-                  <div class="empty-state">No matching events found.</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- TAB 6: Spin Up Fork -->
+    <!-- TAB: Direct Node Spawner (Steering Council) -->
     <section id="tab-create-fork" class="tab-content">
       <div class="grid-2-col">
         <div class="card">
           <div class="card-header">
             <div>
-              <h3>Spin Up New Forked Blockchain</h3>
-              <p class="card-subtitle">Direct node spawner for rapid development & testing</p>
+              <h3>Direct Node Spawner</h3>
+              <p class="card-subtitle">Utility to directly instantiate isolated child nodes</p>
             </div>
-            <span class="badge badge-primary">Dynamic Node Spawner</span>
+            <span class="badge badge-primary">Developer Utility</span>
           </div>
           <div class="card-body">
             <form id="form-create-fork">
@@ -475,13 +642,9 @@
               <div class="form-group">
                 <label for="fork-block-input">Fork Block Height:</label>
                 <div class="input-with-action">
-                  <input type="number" id="fork-block-input" class="form-control" placeholder="Block height where state diverges" min="0">
+                  <input type="number" id="fork-block-input" class="form-control" placeholder="Block height" min="0">
                   <button type="button" id="btn-use-latest-block" class="btn btn-outline">Use Latest</button>
                 </div>
-              </div>
-              <div class="form-group">
-                <label for="fork-initial-data">Initial Legacy Data Points (Optional, Comma-Separated):</label>
-                <input type="text" id="fork-initial-data" class="form-control" placeholder="e.g. 888, 889">
               </div>
               <button type="submit" id="btn-start-fork" class="btn btn-primary btn-lg btn-block">
                 🚀 Start & Spin Up Node
@@ -501,7 +664,6 @@
               <div class="step-item" id="step-2"><span class="step-num">2</span><span>Launch JSON-RPC HTTP node</span></div>
               <div class="step-item" id="step-3"><span class="step-num">3</span><span>Deploy BlockData contract</span></div>
               <div class="step-item" id="step-4"><span class="step-num">4</span><span>Register fork lineage in Consortium Governance</span></div>
-              <div class="step-item" id="step-5"><span class="step-num">5</span><span>Seed initial clinical records</span></div>
             </div>
             <div id="spinup-result-panel" class="spinup-result-panel" style="display: none;"></div>
           </div>
@@ -510,7 +672,112 @@
     </section>
   </div>
 
-  <!-- FHIR JSON Modal Dialog -->
+  <!-- Register Stakeholder Modal -->
+  <div id="register-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3>Register New Federation Stakeholder</h3>
+          <p class="modal-subtitle">Enroll an administrator, clinician, or specialist into the consortium</p>
+        </div>
+        <button id="register-modal-close" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-register-user">
+          <div class="form-group">
+            <label for="reg-name">Full Name / Practitioner Name:</label>
+            <input type="text" id="reg-name" class="form-control" placeholder="e.g. Dr. Jordan Rivera" required>
+          </div>
+          <div class="form-group">
+            <label for="reg-title">Professional Title:</label>
+            <input type="text" id="reg-title" class="form-control" placeholder="e.g. Senior Attending Cardiologist" required>
+          </div>
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="reg-role">Stakeholder Role:</label>
+              <select id="reg-role" class="form-control" required>
+                <option value="STEERING_COUNCIL">STEERING_COUNCIL (Consortium Chair / Global Admin)</option>
+                <option value="ORG_ADMIN">ORG_ADMIN (Hospital / Payor / Lab Administrator)</option>
+                <option value="CLINICIAN">CLINICIAN (Physician / Attending Provider)</option>
+                <option value="SPECIALIST">SPECIALIST (Lab Tech / Pharmacist / Claims Adjuster)</option>
+                <option value="AUDITOR">AUDITOR (Regulatory & Compliance Officer)</option>
+                <option value="PATIENT">PATIENT (Healthcare Consumer)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="reg-org-select">Affiliated Organization:</label>
+              <select id="reg-org-select" class="form-control" required></select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="reg-address">Ethereum Wallet Address:</label>
+            <div class="input-with-action">
+              <input type="text" id="reg-address" class="form-control font-mono" placeholder="0x..." required>
+              <button type="button" id="btn-gen-wallet" class="btn btn-outline">Auto-Gen</button>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" id="btn-cancel-register" class="btn btn-outline">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save & Register Stakeholder</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fulfill FHIR Order Modal -->
+  <div id="fulfill-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 id="fulfill-modal-title">Fulfill Clinical Order</h3>
+          <p id="fulfill-modal-subtitle" class="modal-subtitle">Generate signed HL7 FHIR response and anchor to recipient chain</p>
+        </div>
+        <button id="fulfill-modal-close" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-fulfill-order">
+          <input type="hidden" id="fulfill-request-id">
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="fulfill-resource-type">Response Resource Type:</label>
+              <select id="fulfill-resource-type" class="form-control" required>
+                <option value="DiagnosticReport">DiagnosticReport + Observations (Lab Results)</option>
+                <option value="MedicationDispense">MedicationDispense (Pharmacy Dispensing)</option>
+                <option value="ClaimResponse">ClaimResponse (Payor Adjudication)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="fulfill-status">Clinical Status:</label>
+              <select id="fulfill-status" class="form-control">
+                <option value="final">Final / Approved</option>
+                <option value="completed">Completed / Dispensed</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="fulfill-notes">Clinical Finding / Decision Note:</label>
+            <input type="text" id="fulfill-notes" class="form-control" placeholder="e.g. Findings verified and documented." required>
+          </div>
+          <div class="form-group">
+            <div class="json-header-row">
+              <label for="fulfill-payload">Response FHIR R4 JSON Body:</label>
+              <button type="button" id="btn-refresh-fulfill-template" class="btn btn-xs btn-outline">↺ Refresh Template</button>
+            </div>
+            <textarea id="fulfill-payload" class="form-control font-mono" rows="8" required></textarea>
+          </div>
+          <div class="modal-footer">
+            <button type="button" id="btn-cancel-fulfill" class="btn btn-outline">Cancel</button>
+            <button type="submit" id="btn-submit-fulfillment" class="btn btn-success">
+              ✅ Sign, Commit & Fulfill Order
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- FHIR JSON Viewer Modal -->
   <div id="fhir-modal" class="modal-overlay" style="display: none;">
     <div class="modal-card">
       <div class="modal-header">

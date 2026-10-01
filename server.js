@@ -153,6 +153,176 @@ app.post('/api/governance/execute', async (req, res) => {
   }
 });
 
+// 9b. Steering Council Projects
+app.get('/api/projects', async (req, res) => {
+  try {
+    const projects = await forkTreeService.getProjects();
+    res.json({ success: true, projects });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/projects/create', async (req, res) => {
+  try {
+    const { name, description, rootNetworkId, callerAddress } = req.body;
+    const fromAddr = callerAddress || req.headers['x-caller-address'] || '0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02';
+    const result = await forkTreeService.createProject({
+      name,
+      description,
+      rootNetworkId,
+      callerAddress: fromAddr
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 9c. Detailed Healthcare Fork Proposals
+app.post('/api/governance/proposals/detailed', async (req, res) => {
+  try {
+    const { orgName, networkId, portNumber, parentNetworkId, forkBlockNumber, justification, orgType, fhirCapability, initialAdmin, callerAddress } = req.body;
+    const fromAddr = callerAddress || req.headers['x-caller-address'] || '0x1111111111111111111111111111111111111111';
+    const result = await forkTreeService.submitDetailedForkProposal({
+      orgName,
+      networkId,
+      portNumber,
+      parentNetworkId,
+      forkBlockNumber,
+      justification,
+      orgType,
+      fhirCapability,
+      initialAdmin,
+      callerAddress: fromAddr
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 9d. Inter-Organization Messaging & Cross-Fork FHIR Gateway
+app.get('/api/messages', async (req, res) => {
+  try {
+    const { networkId } = req.query;
+    let messages;
+    if (networkId) {
+      messages = await forkTreeService.getOrganizationMessages(Number(networkId));
+    } else {
+      messages = await forkTreeService.getAllMessages();
+    }
+    res.json({ success: true, messages });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/messages/:networkId', async (req, res) => {
+  try {
+    const netId = parseInt(req.params.networkId, 10);
+    const messages = await forkTreeService.getOrganizationMessages(netId);
+    res.json({ success: true, networkId: netId, messages });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/messages/send', async (req, res) => {
+  try {
+    const { senderNetworkId, recipientNetworkId, recipient, messageType, subject, fhirResourceType, fhirResourceId, payload, responseToMessageId, callerAddress } = req.body;
+    const fromAddr = callerAddress || req.headers['x-caller-address'] || '0x1111111111111111111111111111111111111111';
+    const result = await forkTreeService.sendMessage({
+      senderNetworkId,
+      recipientNetworkId,
+      recipient,
+      messageType,
+      subject,
+      fhirResourceType,
+      fhirResourceId,
+      payload,
+      responseToMessageId,
+      callerAddress: fromAddr
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/messages/status', async (req, res) => {
+  try {
+    const { messageId, status, callerAddress } = req.body;
+    const fromAddr = callerAddress || req.headers['x-caller-address'] || '0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02';
+    const result = await forkTreeService.updateMessageStatus({ messageId, status, callerAddress: fromAddr });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/messages/fulfill-fhir', async (req, res) => {
+  try {
+    const { requestMessageId, responseResourceType, responsePayload, callerAddress } = req.body;
+    const fromAddr = callerAddress || req.headers['x-caller-address'] || '0x4444444444444444444444444444444444444444';
+    const result = await forkTreeService.fulfillFhirOrder({
+      requestMessageId,
+      responseResourceType,
+      responsePayload,
+      callerAddress: fromAddr
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 9e. Register New Stakeholder Persona
+app.post('/api/auth/register', (req, res) => {
+  try {
+    const { name, title, address, organizationId, organizationName, role, port, permissions, avatar } = req.body;
+    if (!name || !address || !role) {
+      return res.status(400).json({ success: false, error: 'Name, address, and role are required' });
+    }
+
+    const personaId = name.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Date.now().toString().slice(-4);
+    const newPersona = {
+      id: personaId,
+      name,
+      title: title || `${role} Stakeholder`,
+      address: address.toLowerCase(),
+      organizationId: Number(organizationId || 11103),
+      organizationName: organizationName || 'Consortium Participant',
+      role,
+      port: Number(port || 8547),
+      permissions: Array.isArray(permissions) ? permissions : ['READ_RECORDS', 'SEND_INTER_ORG_MSG'],
+      avatar: avatar || (role === 'STEERING_COUNCIL' ? '🏛️' : role === 'CLINICIAN' ? '🩺' : role === 'SPECIALIST' ? '🔬' : '🏥')
+    };
+
+    if (!stakeholdersConfig.personas) stakeholdersConfig.personas = [];
+    stakeholdersConfig.personas.push(newPersona);
+
+    try {
+      const confPath = path.join(__dirname, 'config/consortiumStakeholders.json');
+      fs.writeFileSync(confPath, JSON.stringify(stakeholdersConfig, null, 2), 'utf-8');
+    } catch (e) {}
+
+    res.json({ success: true, persona: newPersona, message: `Stakeholder ${name} registered successfully` });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 9f. Vault Stats
+app.get('/api/vault/stats', (req, res) => {
+  try {
+    const storageAdapter = require('./services/storageAdapter');
+    res.json({ success: true, stats: storageAdapter.getVaultStats() });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 10. Add HL7 Patient Health Record (Secured with Caller Address)
 app.post('/api/add-patient-record', async (req, res) => {
   try {
@@ -265,16 +435,20 @@ async function startPlatform() {
 
     console.log('\n[2/3] Checking / Deploying smart contracts...');
     let deployments = forkTreeService.getDeployments();
-    if (!deployments) {
-      console.log('No deployments found. Deploying contracts...');
-      deployments = await deployContracts();
-    }
+    const repoNode = multiChainEngine.getNode(8545);
+    const needDeploy = !deployments || !deployments.repository || !repoNode || !repoNode.contracts.has((deployments.repository.address || '').toLowerCase());
 
-    console.log('\n[3/3] Checking / Seeding fork tree and initial patient data...');
-    const cachePath = path.join(__dirname, 'storage/forkDetail.json');
-    if (!fs.existsSync(cachePath)) {
-      console.log('Seeding initial fork tree topology and HL7 FHIR records...');
+    if (needDeploy) {
+      console.log('Deploying smart contracts across multi-chain network...');
+      deployments = await deployContracts();
+      console.log('Registering clean fork tree topology (0 mock records)...');
       await seedForkTree();
+    } else {
+      const cachePath = path.join(__dirname, 'storage/forkDetail.json');
+      if (!fs.existsSync(cachePath)) {
+        console.log('Registering clean fork tree topology (0 mock records)...');
+        await seedForkTree();
+      }
     }
 
     app.listen(PORT, () => {

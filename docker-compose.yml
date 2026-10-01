@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  # 1. Main Platform Service (Dashboard & API)
+  forktree-platform:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: forktree-platform-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+      - "8545:8545"
+      - "8546:8546"
+      - "8547:8547"
+      - "8548:8548"
+      - "8549:8549"
+      - "8550:8550"
+      - "8551:8551"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - STORAGE_ENCRYPTION_SECRET=consortium-docker-aes256-master-key
+    volumes:
+      - ./storage:/app/storage
+      - ./config:/app/config
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - forktree-net
+
+networks:
+  forktree-net:
+    driver: bridge

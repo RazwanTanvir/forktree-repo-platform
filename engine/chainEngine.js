@@ -108,7 +108,35 @@ class BlockchainNode {
             ]),
             votes: Object.fromEntries(
               Array.from((c.state.votes || new Map()).entries()).map(([k, set]) => [k, Array.from(set)])
-            )
+            ),
+            projects: (c.state.projects || []).map(pr => [
+              pr[0].toString(),
+              String(pr[1]),
+              String(pr[2]),
+              String(pr[3]),
+              pr[4].toString(),
+              !!pr[5],
+              pr[6].toString()
+            ]),
+            steeringCouncil: Object.fromEntries(
+              Array.from((c.state.steeringCouncil || new Map()).entries()).map(([k, v]) => [k, !!v])
+            ),
+            messages: (c.state.messages || []).map(m => [
+              m[0].toString(),
+              m[1].toString(),
+              String(m[2]),
+              m[3].toString(),
+              String(m[4]),
+              String(m[5]),
+              String(m[6]),
+              String(m[7]),
+              String(m[8]),
+              String(m[9]),
+              String(m[10]),
+              Number(m[11]),
+              m[12].toString(),
+              m[13].toString()
+            ])
           } : {
             owner: c.state.owner || '0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02',
             stakeholders: Object.fromEntries(
@@ -198,7 +226,35 @@ class BlockchainNode {
               ]),
               votes: new Map(
                 Object.entries(c.state.votes || {}).map(([k, arr]) => [k, new Set(arr)])
-              )
+              ),
+              projects: (c.state.projects || []).map(pr => [
+                BigInt(pr[0]),
+                String(pr[1]),
+                String(pr[2]),
+                String(pr[3]),
+                BigInt(pr[4]),
+                !!pr[5],
+                BigInt(pr[6])
+              ]),
+              steeringCouncil: new Map(
+                Object.entries(c.state.steeringCouncil || {}).map(([k, v]) => [k.toLowerCase(), !!v])
+              ),
+              messages: (c.state.messages || []).map(m => [
+                BigInt(m[0]),
+                BigInt(m[1]),
+                String(m[2]),
+                BigInt(m[3]),
+                String(m[4]),
+                String(m[5]),
+                String(m[6]),
+                String(m[7]),
+                String(m[8]),
+                String(m[9]),
+                String(m[10]),
+                Number(m[11]),
+                BigInt(m[12]),
+                BigInt(m[13])
+              ])
             } : {
               owner: c.state.owner || '0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02',
               stakeholders: new Map(
@@ -265,6 +321,13 @@ class BlockchainNode {
         BigInt(Math.floor(Date.now() / 1000))
       ]);
     }
+    if (!contract.state.projects) {
+      contract.state.projects = [];
+    }
+    if (!contract.state.steeringCouncil) {
+      contract.state.steeringCouncil = new Map();
+    }
+    contract.state.steeringCouncil.set('0x163f57598de9cc708e9497aa50b6d5e5ed368d02', true);
   }
 
   start() {
@@ -376,6 +439,12 @@ class BlockchainNode {
       case 'eth_getTransactionCount':
         return { jsonrpc: '2.0', id, result: '0x0' };
 
+      case 'eth_getCode': {
+        const addr = (params && params[0] ? params[0] : '').toLowerCase();
+        const contract = this.contracts.get(addr);
+        return { jsonrpc: '2.0', id, result: contract ? '0x6080604052' : '0x' };
+      }
+
       case 'eth_sendTransaction': {
         const tx = (params && params[0]) || {};
         try {
@@ -439,7 +508,10 @@ class BlockchainNode {
               adjacencyList: new Map(),
               organizations: [],
               proposals: [],
-              votes: new Map()
+              votes: new Map(),
+              projects: [],
+              steeringCouncil: new Map([['0x163f57598de9cc708e9497aa50b6d5e5ed368d02', true]]),
+              messages: []
             }
           : {
               owner: (tx.from || this.accounts[0]).toLowerCase(),
@@ -499,10 +571,40 @@ class BlockchainNode {
                 BigInt(Math.floor(Date.now() / 1000))
               ];
               contract.state.organizations.push(org);
-            } else if (parsed.name === 'proposeFork') {
-              const [orgName, networkId, portNumber, parentNetworkId, forkBlockNumber, justification, orgType] = parsed.args;
-              const proposalId = BigInt(contract.state.proposals.length + 1);
+            } else if (parsed.name === 'createProject') {
+              const [name, description, rootNetworkId] = parsed.args;
+              const sender = (tx.from || this.accounts[0]).toLowerCase();
+              const isCouncil = contract.state.steeringCouncil ? !!contract.state.steeringCouncil.get(sender) : (sender === '0x163f57598de9cc708e9497aa50b6d5e5ed368d02');
+              if (!isCouncil && sender !== '0x163f57598de9cc708e9497aa50b6d5e5ed368d02') {
+                throw new Error('Security: Caller is not a Steering Council Admin');
+              }
+              const projectId = BigInt((contract.state.projects || []).length + 1);
+              const proj = [
+                projectId,
+                String(name),
+                String(description),
+                tx.from || this.accounts[0],
+                BigInt(rootNetworkId),
+                true,
+                BigInt(Math.floor(Date.now() / 1000))
+              ];
+              if (!contract.state.projects) contract.state.projects = [];
+              contract.state.projects.push(proj);
+            } else if (parsed.name === 'setSteeringCouncilMember') {
+              const [account, isCouncil] = parsed.args;
+              if (!contract.state.steeringCouncil) contract.state.steeringCouncil = new Map();
+              contract.state.steeringCouncil.set(account.toLowerCase(), Boolean(isCouncil));
+            } else if (parsed.name === 'proposeFork' || parsed.name === 'proposeForkWithDetails') {
+              const proposalId = BigInt((contract.state.proposals || []).length + 1);
               const proposer = tx.from || this.accounts[0];
+              let orgName, networkId, portNumber, parentNetworkId, forkBlockNumber, justification, orgType, fhirCapability, initialAdmin;
+              if (parsed.name === 'proposeForkWithDetails') {
+                [orgName, networkId, portNumber, parentNetworkId, forkBlockNumber, justification, orgType, fhirCapability, initialAdmin] = parsed.args;
+              } else {
+                [orgName, networkId, portNumber, parentNetworkId, forkBlockNumber, justification, orgType] = parsed.args;
+                fhirCapability = 'Patient, Observation, Condition';
+                initialAdmin = proposer;
+              }
               const proposal = [
                 proposalId,
                 String(proposer),
@@ -516,11 +618,43 @@ class BlockchainNode {
                 1n, // votesFor (proposer automatic vote)
                 0n, // votesAgainst
                 false, // executed
-                BigInt(Math.floor(Date.now() / 1000))
+                BigInt(Math.floor(Date.now() / 1000)),
+                String(fhirCapability || 'Patient, Observation, Condition'),
+                String(initialAdmin || proposer)
               ];
+              if (!contract.state.proposals) contract.state.proposals = [];
               contract.state.proposals.push(proposal);
               if (!contract.state.votes) contract.state.votes = new Map();
               contract.state.votes.set(proposalId.toString(), new Set([proposer.toLowerCase()]));
+            } else if (parsed.name === 'sendMessage') {
+              const [senderNetworkId, recipientNetworkId, recipient, messageType, subject, fhirResourceType, fhirResourceId, payloadHash, payload, responseToMessageId] = parsed.args;
+              const messageId = BigInt((contract.state.messages || []).length + 1);
+              const sender = tx.from || this.accounts[0];
+              const msgObj = [
+                messageId,
+                BigInt(senderNetworkId),
+                String(sender),
+                BigInt(recipientNetworkId),
+                String(recipient),
+                String(messageType),
+                String(subject),
+                String(fhirResourceType),
+                String(fhirResourceId),
+                String(payloadHash),
+                String(payload),
+                0, // PENDING status
+                BigInt(Math.floor(Date.now() / 1000)),
+                BigInt(responseToMessageId || 0)
+              ];
+              if (!contract.state.messages) contract.state.messages = [];
+              contract.state.messages.push(msgObj);
+            } else if (parsed.name === 'updateMessageStatus') {
+              const [messageId, status] = parsed.args;
+              const mIdx = Number(messageId) - 1;
+              if (mIdx < 0 || !contract.state.messages || mIdx >= contract.state.messages.length) {
+                throw new Error('Invalid message ID');
+              }
+              contract.state.messages[mIdx][11] = Number(status);
             } else if (parsed.name === 'voteOnProposal') {
               const [proposalId, support] = parsed.args;
               const pIdx = Number(proposalId) - 1;
@@ -576,10 +710,11 @@ class BlockchainNode {
 
               // Register org in consortium
               const orgId = BigInt(contract.state.organizations.length + 1);
+              const adminAddr = (prop[14] && prop[14] !== ethers.ZeroAddress) ? prop[14] : prop[1];
               contract.state.organizations.push([
                 orgId,
                 prop[2], // orgName
-                prop[1], // proposer
+                adminAddr, // admin (initialAdmin or proposer)
                 netId,
                 port,
                 prop[8], // orgType
@@ -736,8 +871,45 @@ class BlockchainNode {
         }
         case 'getProposalByIndex': {
           const idx = Number(parsed.args[0]);
-          const item = (contract.state.proposals || [])[idx] || [0n, ethers.ZeroAddress, '', 0n, 0n, 0n, 0n, '', '', 0n, 0n, false, 0n];
+          const item = (contract.state.proposals || [])[idx] || [0n, ethers.ZeroAddress, '', 0n, 0n, 0n, 0n, '', '', 0n, 0n, false, 0n, '', ethers.ZeroAddress];
           return this.consortiumGovIface.encodeFunctionResult('getProposalByIndex', [item]);
+        }
+        case 'totalProjects': {
+          return this.consortiumGovIface.encodeFunctionResult('totalProjects', [BigInt((contract.state.projects || []).length)]);
+        }
+        case 'getAllProjects': {
+          return this.consortiumGovIface.encodeFunctionResult('getAllProjects', [contract.state.projects || []]);
+        }
+        case 'getProjectByIndex': {
+          const idx = Number(parsed.args[0]);
+          const item = (contract.state.projects || [])[idx] || [0n, '', '', ethers.ZeroAddress, 0n, false, 0n];
+          return this.consortiumGovIface.encodeFunctionResult('getProjectByIndex', [item]);
+        }
+        case 'isSteeringCouncil': {
+          const target = String(parsed.args[0]).toLowerCase();
+          const isC = (contract.state.steeringCouncil && contract.state.steeringCouncil.get(target)) || target === '0x163f57598de9cc708e9497aa50b6d5e5ed368d02';
+          return this.consortiumGovIface.encodeFunctionResult('isSteeringCouncil', [Boolean(isC)]);
+        }
+        case 'totalMessages': {
+          return this.consortiumGovIface.encodeFunctionResult('totalMessages', [BigInt((contract.state.messages || []).length)]);
+        }
+        case 'getAllMessages': {
+          return this.consortiumGovIface.encodeFunctionResult('getAllMessages', [contract.state.messages || []]);
+        }
+        case 'getMessageByIndex': {
+          const idx = Number(parsed.args[0]);
+          const item = (contract.state.messages || [])[idx] || [0n, 0n, ethers.ZeroAddress, 0n, ethers.ZeroAddress, '', '', '', '', '', '', 0, 0n, 0n];
+          return this.consortiumGovIface.encodeFunctionResult('getMessageByIndex', [item]);
+        }
+        case 'getMessagesForOrganization': {
+          const targetNet = BigInt(parsed.args[0]);
+          const msgIds = [];
+          for (const m of (contract.state.messages || [])) {
+            if (m[1] === targetNet || m[3] === targetNet) {
+              msgIds.push(m[0]);
+            }
+          }
+          return this.consortiumGovIface.encodeFunctionResult('getMessagesForOrganization', [msgIds]);
         }
       }
     } else if (contract.type === 'BlockData') {

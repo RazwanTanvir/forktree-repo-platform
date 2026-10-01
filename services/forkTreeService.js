@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { ethers } = require('ethers');
 const { ContractClient } = require('./contractClient');
 const { ConsortiumGovernance, StoreForkEvent, BlockData } = require('../contracts/compiledArtifacts');
+const storageAdapter = require('./storageAdapter');
 const topology = require('../config/networkTopology.json');
 const { multiChainEngine } = require('../engine/chainEngine');
 
@@ -1007,6 +1008,329 @@ class ForkTreeService {
       }
     };
   }
+
+  // --- Steering Council Project Methods ---
+  async getProjects() {
+    const deps = this.getDeployments();
+    if (!deps || !deps.repository || !deps.repository.address) {
+      return [];
+    }
+
+    try {
+      const client = new ContractClient(
+        topology.repositoryChain.rpcUrl,
+        ConsortiumGovernance.abi,
+        deps.repository.address
+      );
+      const raw = await client.call('getAllProjects');
+      return Array.from(raw).map(p => ({
+        projectId: Number(p.projectId || p[0]),
+        name: String(p.name || p[1]),
+        description: String(p.description || p[2]),
+        owner: String(p.owner || p[3]),
+        rootNetworkId: Number(p.rootNetworkId || p[4]),
+        active: Boolean(p.active !== undefined ? p.active : p[5]),
+        createdAt: Number(p.createdAt || p[6]),
+        createdAtIso: new Date(Number(p.createdAt || p[6]) * 1000).toISOString()
+      }));
+    } catch (err) {
+      console.warn('[ForkTreeService] Failed to fetch projects:', err.message);
+      return [];
+    }
+  }
+
+  async createProject({ name, description, rootNetworkId, callerAddress }) {
+    const deps = this.getDeployments();
+    if (!deps || !deps.repository || !deps.repository.address) {
+      throw new Error('Repository contract not deployed');
+    }
+
+    const client = new ContractClient(
+      topology.repositoryChain.rpcUrl,
+      ConsortiumGovernance.abi,
+      deps.repository.address
+    );
+
+    const fromAddr = callerAddress || '0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02';
+    const tx = await client.send('createProject', [
+      name,
+      description,
+      BigInt(rootNetworkId || 11102)
+    ], fromAddr);
+
+    return {
+      success: true,
+      message: `Project "${name}" created on Steering Council Governance Hub`,
+      txHash: tx.hash
+    };
+  }
+
+  // --- Detailed Fork Proposals ---
+  async submitDetailedForkProposal({
+    orgName,
+    networkId,
+    portNumber,
+    parentNetworkId,
+    forkBlockNumber,
+    justification,
+    orgType = 'Specialty Clinic',
+    fhirCapability = 'Patient, Observation, Condition',
+    initialAdmin,
+    callerAddress
+  }) {
+    const deps = this.getDeployments();
+    if (!deps || !deps.repository || !deps.repository.address) {
+      throw new Error('Consortium governance contract not deployed');
+    }
+
+    const client = new ContractClient(
+      topology.repositoryChain.rpcUrl,
+      ConsortiumGovernance.abi,
+      deps.repository.address
+    );
+
+    const fromAddr = callerAddress || '0x1111111111111111111111111111111111111111';
+    const adminAddr = initialAdmin || fromAddr;
+
+    let targetPort = Number(portNumber);
+    if (!targetPort || targetPort <= 0) {
+      const active = await this.getActiveChains();
+      const maxPort = active.reduce((max, c) => Math.max(max, c.port), 8551);
+      targetPort = maxPort + 1;
+    }
+
+    let targetNet = Number(networkId);
+    if (!targetNet || targetNet <= 0) {
+      targetNet = targetPort + 2556;
+    }
+
+    let forkBlock = Number(forkBlockNumber);
+    if (isNaN(forkBlock) || forkBlock < 0) forkBlock = 0;
+
+    const tx = await client.send('proposeForkWithDetails', [
+      orgName,
+      targetNet,
+      targetPort,
+      Number(parentNetworkId),
+      forkBlock,
+      justification || `Operational fork for ${orgName}`,
+      orgType,
+      fhirCapability,
+      adminAddr
+    ], fromAddr);
+
+    return {
+      success: true,
+      message: `Detailed fork request for '${orgName}' (${orgType}) submitted to consortium ballot`,
+      txHash: tx.hash,
+      networkId: targetNet,
+      portNumber: targetPort
+    };
+  }
+
+  // --- Inter-Organization Messaging & Cross-Fork FHIR Gateway ---
+  async sendMessage({
+    senderNetworkId,
+    recipientNetworkId,
+    recipient,
+    messageType = 'GENERAL',
+    subject,
+    fhirResourceType = '',
+    fhirResourceId = '',
+    payload,
+    responseToMessageId = 0,
+    callerAddress
+  }) {
+    const deps = this.getDeployments();
+    if (!deps || !deps.repository || !deps.repository.address) {
+      throw new Error('Governance repository contract not deployed');
+    }
+
+    const client = new ContractClient(
+      topology.repositoryChain.rpcUrl,
+      ConsortiumGovernance.abi,
+      deps.repository.address
+    );
+
+    const fromAddr = callerAddress || '0x1111111111111111111111111111111111111111';
+    const toAddr = recipient || ethers.ZeroAddress;
+
+    // Encrypt and hash payload via storage adapter
+    const payloadStr = typeof payload === 'string' ? payload : JSON.stringify(payload || {});
+    const storedVault = storageAdapter.storeEncryptedPayload(payloadStr);
+
+    const tx = await client.send('sendMessage', [
+      BigInt(senderNetworkId),
+      BigInt(recipientNetworkId),
+      toAddr,
+      String(messageType),
+      String(subject || 'Inter-Organization Healthcare Transmission'),
+      String(fhirResourceType),
+      String(fhirResourceId),
+      String(storedVault.dataHash),
+      String(payloadStr), // On-chain for simulation visibility, accompanied by hash
+      BigInt(responseToMessageId || 0)
+    ], fromAddr);
+
+    return {
+      success: true,
+      message: `Message sent from Network ${senderNetworkId} to Network ${recipientNetworkId}`,
+      txHash: tx.hash,
+      dataHash: storedVault.dataHash,
+      cid: storedVault.cid
+    };
+  }
+
+  async getAllMessages() {
+    const deps = this.getDeployments();
+    if (!deps || !deps.repository || !deps.repository.address) {
+      return [];
+    }
+
+    try {
+      const client = new ContractClient(
+        topology.repositoryChain.rpcUrl,
+        ConsortiumGovernance.abi,
+        deps.repository.address
+      );
+      const raw = await client.call('getAllMessages');
+      return Array.from(raw).map(m => {
+        let parsedPayload = m.payload || m[10];
+        try { parsedPayload = JSON.parse(parsedPayload); } catch (e) {}
+
+        const statusNum = Number(m.status !== undefined ? m.status : m[11]);
+        const statusMap = { 0: 'PENDING', 1: 'DELIVERED', 2: 'ACKNOWLEDGED', 3: 'FULFILLED', 4: 'REJECTED' };
+
+        return {
+          messageId: Number(m.messageId || m[0]),
+          senderNetworkId: Number(m.senderNetworkId || m[1]),
+          sender: String(m.sender || m[2]),
+          recipientNetworkId: Number(m.recipientNetworkId || m[3]),
+          recipient: String(m.recipient || m[4]),
+          messageType: String(m.messageType || m[5]),
+          subject: String(m.subject || m[6]),
+          fhirResourceType: String(m.fhirResourceType || m[7]),
+          fhirResourceId: String(m.fhirResourceId || m[8]),
+          payloadHash: String(m.payloadHash || m[9]),
+          payload: parsedPayload,
+          rawPayload: String(m.payload || m[10]),
+          status: statusNum,
+          statusText: statusMap[statusNum] || 'UNKNOWN',
+          timestamp: Number(m.timestamp || m[12]),
+          timestampIso: new Date(Number(m.timestamp || m[12]) * 1000).toISOString(),
+          responseToMessageId: Number(m.responseToMessageId || m[13])
+        };
+      });
+    } catch (err) {
+      console.warn('[ForkTreeService] Failed to fetch messages:', err.message);
+      return [];
+    }
+  }
+
+  async getOrganizationMessages(networkId) {
+    const all = await this.getAllMessages();
+    const netNum = Number(networkId);
+    return all.filter(m => m.senderNetworkId === netNum || m.recipientNetworkId === netNum);
+  }
+
+  async updateMessageStatus({ messageId, status, callerAddress }) {
+    const deps = this.getDeployments();
+    if (!deps || !deps.repository || !deps.repository.address) {
+      throw new Error('Governance contract not deployed');
+    }
+
+    const client = new ContractClient(
+      topology.repositoryChain.rpcUrl,
+      ConsortiumGovernance.abi,
+      deps.repository.address
+    );
+
+    const fromAddr = callerAddress || '0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02';
+    const tx = await client.send('updateMessageStatus', [
+      BigInt(messageId),
+      Number(status)
+    ], fromAddr);
+
+    return {
+      success: true,
+      message: `Message #${messageId} status updated to ${status}`,
+      txHash: tx.hash
+    };
+  }
+
+  // --- Automated FHIR Order Fulfillment ---
+  // e.g. Lab fulfills ServiceRequest with DiagnosticReport + Observation
+  // or Pharmacy fulfills MedicationRequest with MedicationDispense
+  // or Payor fulfills Claim with ClaimResponse
+  async fulfillFhirOrder({ requestMessageId, responseResourceType, responsePayload, callerAddress }) {
+    const all = await this.getAllMessages();
+    const reqMsg = all.find(m => m.messageId === Number(requestMessageId));
+    if (!reqMsg) {
+      throw new Error(`Original request message #${requestMessageId} not found`);
+    }
+
+    const senderNet = reqMsg.recipientNetworkId; // Fulfiller becomes sender
+    const recipientNet = reqMsg.senderNetworkId; // Original requester becomes recipient
+    const recipientAddr = reqMsg.sender;
+
+    // 1. Commit clinical record on fulfilling organization's chain if applicable
+    const fulfillingChain = topology.chains.find(c => c.networkId === senderNet);
+    const patientId = (responsePayload && responsePayload.subject && responsePayload.subject.reference)
+      ? responsePayload.subject.reference.replace('Patient/', '')
+      : (reqMsg.payload && reqMsg.payload.subject && reqMsg.payload.subject.reference)
+        ? reqMsg.payload.subject.reference.replace('Patient/', '')
+        : 'P101';
+
+    let committedRecord = null;
+    if (fulfillingChain) {
+      try {
+        const clinicalCode = (responsePayload && responsePayload.code && responsePayload.code.coding && responsePayload.code.coding[0])
+          ? `${responsePayload.code.coding[0].system}:${responsePayload.code.coding[0].code}`
+          : 'CLIN-FULFILL-01';
+
+        committedRecord = await this.addPatientRecord({
+          port: fulfillingChain.port,
+          patientId,
+          resourceType: responseResourceType || 'DiagnosticReport',
+          clinicalCode,
+          resourceData: responsePayload,
+          callerAddress
+        });
+      } catch (e) {
+        console.warn(`[ForkTreeService] Note: Record ingestion on chain ${fulfillingChain.port} skipped or failed:`, e.message);
+      }
+    }
+
+    // 2. Dispatch the response message
+    const msgType = `FHIR_${(responseResourceType || 'DIAGNOSTIC_REPORT').toUpperCase().replace('-', '_')}`;
+    const sent = await this.sendMessage({
+      senderNetworkId: senderNet,
+      recipientNetworkId: recipientNet,
+      recipient: recipientAddr,
+      messageType: msgType,
+      subject: `Fulfillment Response for #${reqMsg.messageId} (${reqMsg.subject})`,
+      fhirResourceType: responseResourceType || 'DiagnosticReport',
+      fhirResourceId: responsePayload.id || `RES-${Date.now()}`,
+      payload: responsePayload,
+      responseToMessageId: reqMsg.messageId,
+      callerAddress
+    });
+
+    // 3. Update original request message to status 3 (FULFILLED)
+    await this.updateMessageStatus({
+      messageId: reqMsg.messageId,
+      status: 3, // FULFILLED
+      callerAddress
+    });
+
+    return {
+      success: true,
+      message: `Request #${reqMsg.messageId} successfully fulfilled and cross-fork response dispatched!`,
+      responseMessage: sent,
+      committedRecord
+    };
+  }
+
 }
 
 module.exports = new ForkTreeService();

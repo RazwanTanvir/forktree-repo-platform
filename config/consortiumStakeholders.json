@@ -1,20 +1,24 @@
 {
   "personas": [
     {
-      "id": "consortium-auditor",
-      "name": "Elena Rostova",
-      "title": "Consortium Regulatory Auditor",
-      "address": "0x6666666666666666666666666666666666666666",
+      "id": "steering-council-admin",
+      "name": "Dr. Marcus Vance",
+      "title": "Consortium Steering Council Chair",
+      "address": "0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02",
       "organizationId": 11101,
-      "organizationName": "Consortium Governance Board",
-      "role": "AUDITOR",
+      "organizationName": "Consortium Steering Council",
+      "role": "STEERING_COUNCIL",
       "port": 8545,
       "permissions": [
-        "READ_ALL",
-        "AUDIT_LOGS",
-        "VIEW_PROPOSALS"
+        "MANAGE_CONSORTIUM",
+        "CREATE_PROJECT",
+        "REGISTER_ROOT_ORG",
+        "APPROVE_FORK",
+        "VOTE_PROPOSALS",
+        "SEND_INTER_ORG_MSG",
+        "VIEW_ALL"
       ],
-      "avatar": "⚖️"
+      "avatar": "🏛️"
     },
     {
       "id": "metro-admin",
@@ -23,12 +27,14 @@
       "address": "0x1111111111111111111111111111111111111111",
       "organizationId": 11103,
       "organizationName": "Metro General Hospital",
-      "role": "ADMIN",
+      "role": "ORG_ADMIN",
       "port": 8547,
       "permissions": [
+        "REQUEST_FORK",
         "VOTE_PROPOSALS",
         "SUBMIT_PROPOSALS",
         "MANAGE_STAKEHOLDERS",
+        "SEND_INTER_ORG_MSG",
         "READ_RECORDS",
         "WRITE_RECORDS"
       ],
@@ -46,90 +52,126 @@
       "permissions": [
         "WRITE_RECORDS",
         "READ_RECORDS",
-        "QUERY_EHR"
+        "QUERY_EHR",
+        "DISPATCH_FHIR_ORDER",
+        "SEND_INTER_ORG_MSG"
       ],
       "avatar": "🩺"
     },
     {
-      "id": "biolabs-admin",
-      "name": "Marcus Sterling",
-      "title": "Director of Diagnostic Operations",
-      "address": "0x3333333333333333333333333333333333333333",
+      "id": "biolabs-specialist",
+      "name": "Bob Martinez",
+      "title": "Diagnostic Pathologist / Lab Tech",
+      "address": "0x4444444444444444444444444444444444444444",
       "organizationId": 11104,
       "organizationName": "BioLabs Pathology & Diagnostics",
-      "role": "ADMIN",
+      "role": "SPECIALIST",
       "port": 8548,
       "permissions": [
-        "VOTE_PROPOSALS",
-        "SUBMIT_PROPOSALS",
-        "MANAGE_STAKEHOLDERS",
+        "FULFILL_LAB_ORDERS",
+        "WRITE_DIAGNOSTIC_REPORTS",
         "READ_RECORDS",
-        "WRITE_RECORDS"
+        "SEND_INTER_ORG_MSG"
       ],
       "avatar": "🔬"
     },
     {
-      "id": "biolabs-specialist",
-      "name": "Bob Martinez",
-      "title": "Lead Clinical Lab Technologist",
-      "address": "0x3333333333333333333333333333333333333334",
-      "organizationId": 11104,
-      "organizationName": "BioLabs Pathology & Diagnostics",
-      "role": "CLINICIAN",
-      "port": 8548,
-      "permissions": [
-        "WRITE_RECORDS",
-        "READ_RECORDS"
-      ],
-      "avatar": "🧪"
-    },
-    {
-      "id": "cardio-specialist",
-      "name": "Dr. Carol Lin",
-      "title": "Lead Interventional Cardiologist",
-      "address": "0x4444444444444444444444444444444444444444",
+      "id": "horizon-payor-admin",
+      "name": "Sarah Jenkins",
+      "title": "VP Health Insurance & Claims",
+      "address": "0x5555555555555555555555555555555555555555",
       "organizationId": 11105,
-      "organizationName": "CardioSpecialty Center",
-      "role": "CLINICIAN",
+      "organizationName": "Horizon Health Payor",
+      "role": "ORG_ADMIN",
       "port": 8549,
       "permissions": [
-        "WRITE_RECORDS",
-        "READ_RECORDS",
-        "QUERY_EHR"
+        "REQUEST_FORK",
+        "PROCESS_CLAIMS",
+        "VOTE_PROPOSALS",
+        "SEND_INTER_ORG_MSG",
+        "READ_RECORDS"
       ],
-      "avatar": "🩻"
+      "avatar": "🛡️"
     },
     {
-      "id": "emergency-physician",
-      "name": "Dr. Dave Ross",
-      "title": "Emergency Medicine Attending",
-      "address": "0x5555555555555555555555555555555555555555",
-      "organizationId": 11106,
-      "organizationName": "Emergency & Urgent Care",
-      "role": "CLINICIAN",
-      "port": 8550,
+      "id": "apex-pharmacy-specialist",
+      "name": "David Cho, PharmD",
+      "title": "Lead Clinical Pharmacist",
+      "address": "0x7777777777777777777777777777777777777777",
+      "organizationId": 11107,
+      "organizationName": "Outpatient Pharmacy Network",
+      "role": "SPECIALIST",
+      "port": 8551,
       "permissions": [
-        "WRITE_RECORDS",
-        "READ_RECORDS",
-        "QUERY_EHR"
+        "DISPENSE_MEDICATION",
+        "RECEIVE_PRESCRIPTIONS",
+        "SEND_INTER_ORG_MSG",
+        "READ_RECORDS"
       ],
-      "avatar": "🚑"
+      "avatar": "💊"
+    },
+    {
+      "id": "consortium-auditor",
+      "name": "Elena Rostova",
+      "title": "Consortium Regulatory Auditor",
+      "address": "0x6666666666666666666666666666666666666666",
+      "organizationId": 11101,
+      "organizationName": "Consortium Governance Board",
+      "role": "AUDITOR",
+      "port": 8545,
+      "permissions": [
+        "READ_ALL",
+        "AUDIT_LOGS",
+        "VIEW_PROPOSALS",
+        "VERIFY_HASHES"
+      ],
+      "avatar": "⚖️"
     },
     {
       "id": "patient-p101",
       "name": "Johnathan Doe",
-      "title": "Consortium Patient (P101)",
-      "address": "0x7777777777777777777777777777777777777777",
+      "title": "Healthcare Consumer / Patient",
+      "address": "0x9999999999999999999999999999999999999999",
       "organizationId": 11102,
       "organizationName": "Master Patient Index (MPI)",
       "role": "PATIENT",
       "port": 8546,
       "permissions": [
-        "READ_OWN_RECORDS",
-        "GRANT_CONSENT",
-        "REVOKE_CONSENT"
+        "VIEW_OWN_EHR",
+        "MANAGE_CONSENT",
+        "AUDIT_MY_ACCESS"
       ],
       "avatar": "👤"
+    },
+    {
+      "id": "test-man-5177",
+      "name": "Test Man",
+      "title": "Lab Owner",
+      "address": "0x8ca42809f1294f43ff318bdcb75886351dc25462",
+      "organizationId": 11103,
+      "organizationName": "Fork Alpha",
+      "role": "ORG_ADMIN",
+      "port": 8547,
+      "permissions": [
+        "READ_RECORDS",
+        "SEND_INTER_ORG_MSG"
+      ],
+      "avatar": "🏥"
+    },
+    {
+      "id": "test-man-6172",
+      "name": "Test Man",
+      "title": "Lab Owner",
+      "address": "0x941708225ee56d52766f34ef5543a93ee396ea8e",
+      "organizationId": 11103,
+      "organizationName": "Fork Alpha",
+      "role": "CLINICIAN",
+      "port": 8547,
+      "permissions": [
+        "READ_RECORDS",
+        "SEND_INTER_ORG_MSG"
+      ],
+      "avatar": "🩺"
     }
   ],
   "defaultStakeholders": {
@@ -138,11 +180,6 @@
         "address": "0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02",
         "role": "ADMIN",
         "name": "MPI Root Operator"
-      },
-      {
-        "address": "0x7777777777777777777777777777777777777777",
-        "role": "PATIENT",
-        "name": "Johnathan Doe"
       }
     ],
     "8547": [
@@ -155,11 +192,6 @@
         "address": "0x2222222222222222222222222222222222222222",
         "role": "CLINICIAN",
         "name": "Dr. Alice Smith"
-      },
-      {
-        "address": "0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02",
-        "role": "ADMIN",
-        "name": "System Dev Admin"
       }
     ],
     "8548": [
@@ -169,38 +201,23 @@
         "name": "Marcus Sterling"
       },
       {
-        "address": "0x3333333333333333333333333333333333333334",
+        "address": "0x4444444444444444444444444444444444444444",
         "role": "CLINICIAN",
         "name": "Bob Martinez"
-      },
-      {
-        "address": "0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02",
-        "role": "ADMIN",
-        "name": "System Dev Admin"
       }
     ],
     "8549": [
       {
-        "address": "0x4444444444444444444444444444444444444444",
-        "role": "CLINICIAN",
-        "name": "Dr. Carol Lin"
-      },
-      {
-        "address": "0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02",
+        "address": "0x5555555555555555555555555555555555555555",
         "role": "ADMIN",
-        "name": "System Dev Admin"
+        "name": "Sarah Jenkins"
       }
     ],
     "8550": [
       {
         "address": "0x5555555555555555555555555555555555555555",
-        "role": "CLINICIAN",
-        "name": "Dr. Dave Ross"
-      },
-      {
-        "address": "0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02",
         "role": "ADMIN",
-        "name": "System Dev Admin"
+        "name": "Dr. Dave Ross"
       }
     ],
     "8551": [
@@ -208,6 +225,11 @@
         "address": "0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02",
         "role": "ADMIN",
         "name": "Pharmacy Admin"
+      },
+      {
+        "address": "0x7777777777777777777777777777777777777777",
+        "role": "CLINICIAN",
+        "name": "David Cho, PharmD"
       }
     ]
   }
