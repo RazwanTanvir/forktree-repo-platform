@@ -4,7 +4,7 @@ A modern, clean, cross-platform implementation of the **BlockchainForkTree** res
 
 ---
 
-## 🌟 Key Features
+## Key Features
 
 1. **Multi-Chain Architecture (7 Independent Blockchains)**:
    - **Repository Chain (Port 8545 / Network ID 11101)**: Stores the global fork registry, parent-child edges, and graph adjacency list via `StoreForkEvent.sol`.
@@ -32,7 +32,7 @@ A modern, clean, cross-platform implementation of the **BlockchainForkTree** res
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Prerequisites
 - **Node.js** (v18.0+ or newer, tested on Node v26.5.0)
@@ -89,11 +89,11 @@ Expected output:
 npm start
 ```
 Open your browser at:
-👉 **[http://localhost:3000](http://localhost:3000)**
+**[http://localhost:3000](http://localhost:3000)**
 
 ---
 
-## 💻 CLI Commands
+## CLI Commands
 
 You can run searches and pipeline operations via CLI:
 
@@ -107,7 +107,7 @@ You can run searches and pipeline operations via CLI:
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 forktree-platform/
@@ -145,7 +145,7 @@ forktree-platform/
 
 ---
 
-## 🔬 How the Fork Tree Works
+## How the Fork Tree Works
 
 ```
                      [Port 8545 / Network 11101]
