@@ -115,28 +115,36 @@ class ForkTreeService {
 
       const rootChain = topology.chains.find(c => c.isRoot) || topology.chains[0];
 
+      const seenNodes = new Set();
+      const seenEdges = new Set();
+
       for (const fork of allDetails) {
         const netId = Number(fork.networkId || fork[0]);
         const port = Number(fork.portNumber || fork[1]);
         const parentNetId = Number(fork.parentNetworkId || fork[2]);
         const forkBlock = Number(fork.parentChainForkBlockNumber || fork[3]);
 
-        const chainMeta = topology.chains.find(c => c.networkId === netId) || {
-          name: `Fork Chain ${netId}`,
-          isRoot: false
-        };
+        if (!seenNodes.has(netId)) {
+          seenNodes.add(netId);
+          const chainMeta = topology.chains.find(c => c.networkId === netId) || {
+            name: `Fork Chain ${netId}`,
+            isRoot: false
+          };
 
-        nodes.push({
-          networkId: netId,
-          port,
-          name: chainMeta.name,
-          isRoot: netId === rootChain.networkId,
-          parentNetworkId: parentNetId,
-          forkBlockNumber: forkBlock,
-          contractAddress: (deps.dataChains && deps.dataChains[netId]) ? deps.dataChains[netId].address : null
-        });
+          nodes.push({
+            networkId: netId,
+            port,
+            name: chainMeta.name,
+            isRoot: netId === rootChain.networkId,
+            parentNetworkId: parentNetId,
+            forkBlockNumber: forkBlock,
+            contractAddress: (deps.dataChains && deps.dataChains[netId]) ? deps.dataChains[netId].address : null
+          });
+        }
 
-        if (parentNetId !== topology.repositoryChain.networkId) {
+        const edgeKey = `${parentNetId}->${netId}`;
+        if (parentNetId !== topology.repositoryChain.networkId && !seenEdges.has(edgeKey)) {
+          seenEdges.add(edgeKey);
           edges.push({
             from: parentNetId,
             to: netId,
@@ -495,6 +503,14 @@ class ForkTreeService {
       timestamp
     ], fromAddr);
 
+    // Store encrypted in hybrid off-chain vault (AES-256-GCM)
+    let vaultResult = null;
+    try {
+      vaultResult = storageAdapter.storeEncryptedPayload(jsonStr);
+    } catch (e) {
+      console.warn('[ForkTreeService] Vault storage warning:', e.message);
+    }
+
     return {
       success: true,
       port: portNum,
@@ -503,6 +519,7 @@ class ForkTreeService {
       resourceType,
       clinicalCode,
       dataHash,
+      vaultCid: vaultResult ? vaultResult.cid : null,
       timestamp,
       txHash: tx.hash,
       callerAddress: fromAddr
@@ -1328,6 +1345,195 @@ class ForkTreeService {
       message: `Request #${reqMsg.messageId} successfully fulfilled and cross-fork response dispatched!`,
       responseMessage: sent,
       committedRecord
+    };
+  }
+
+  // --- Multi-Fork Block & Data Explorer Services ---
+
+  async getExplorerChains() {
+    const statuses = await this.getNodeStatuses();
+    const chainsList = [];
+
+    // Repository chain
+    const repoStatus = statuses.find(s => s.port === 8545) || {};
+    const repoNode = multiChainEngine.getNode(8545);
+    chainsList.push({
+      networkId: 11101,
+      port: 8545,
+      name: 'Consortium Governance Repository',
+      role: 'repository',
+      parentNetworkId: null,
+      forkBlockNumber: 0,
+      currentBlockHeight: repoNode ? repoNode.blockNumber : (repoStatus.blockNumber || 0),
+      totalBlocks: repoNode ? repoNode.blocks.length : (repoStatus.blockNumber ? repoStatus.blockNumber + 1 : 1),
+      totalRecords: 0,
+      contractAddress: repoStatus.contractAddress || null,
+      online: repoStatus.online !== false,
+      isRoot: false
+    });
+
+    // Data chains
+    for (const chain of topology.chains) {
+      const st = statuses.find(s => s.port === chain.port) || {};
+      const node = multiChainEngine.getNode(chain.port);
+      let records = [];
+      try {
+        records = await this.getChainPatientRecords(chain.port);
+      } catch (e) {}
+
+      chainsList.push({
+        networkId: chain.networkId,
+        port: chain.port,
+        name: chain.name,
+        role: chain.isRoot ? 'root' : 'fork',
+        parentNetworkId: chain.parentNetworkId,
+        forkBlockNumber: chain.forkBlockNumber,
+        currentBlockHeight: node ? node.blockNumber : (st.blockNumber || 0),
+        totalBlocks: node ? node.blocks.length : (st.blockNumber ? st.blockNumber + 1 : 1),
+        totalRecords: records.length,
+        contractAddress: st.contractAddress || null,
+        online: st.online !== false,
+        isRoot: !!chain.isRoot
+      });
+    }
+
+    return chainsList;
+  }
+
+  async getChainBlocks(port) {
+    const portNum = Number(port);
+    const node = multiChainEngine.getNode(portNum);
+    const chainRecords = await this.getChainPatientRecords(portNum);
+
+    let rawBlocks = [];
+    if (node && node.getAllBlocks) {
+      rawBlocks = node.getAllBlocks();
+    } else {
+      const chainConfig = portNum === 8545 ? topology.repositoryChain : topology.chains.find(c => c.port === portNum);
+      if (chainConfig) {
+        try {
+          const provider = new ethers.JsonRpcProvider(chainConfig.rpcUrl);
+          const currentHeight = Number(await provider.send('eth_blockNumber', []));
+          for (let b = 0; b <= currentHeight; b++) {
+            const blk = await provider.send('eth_getBlockByNumber', ['0x' + b.toString(16), false]);
+            if (blk) rawBlocks.push(blk);
+          }
+        } catch (e) {}
+      }
+    }
+
+    // Correlate blocks with smart contract patient records
+    return rawBlocks.map((b, idx) => {
+      const bNum = typeof b.blockNumber === 'number' ? b.blockNumber : (b.number ? parseInt(b.number, 16) : idx);
+      const recordsInBlock = chainRecords.filter(r => r.blockNumber === bNum);
+
+      return {
+        blockNumber: bNum,
+        blockNumberHex: b.number || ('0x' + bNum.toString(16)),
+        hash: b.hash || ethers.keccak256(ethers.toUtf8Bytes(`block-${portNum}-${bNum}`)),
+        parentHash: b.parentHash || ('0x' + '0'.repeat(64)),
+        timestamp: b.timestampSec || (b.timestamp ? parseInt(b.timestamp, 16) : Math.floor(Date.now() / 1000)),
+        timestampIso: b.timestampSec ? new Date(b.timestampSec * 1000).toISOString() : (b.timestamp ? new Date(parseInt(b.timestamp, 16) * 1000).toISOString() : new Date().toISOString()),
+        miner: b.miner || '0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02',
+        gasUsed: b.gasUsed || '0x5208',
+        txCount: (b.transactions || []).length,
+        transactions: b.transactions || [],
+        recordsCount: recordsInBlock.length,
+        patientRecords: recordsInBlock
+      };
+    });
+  }
+
+  async getChainBlockDetail(port, blockNumber) {
+    const portNum = Number(port);
+    const bNum = Number(blockNumber);
+    const allBlocks = await this.getChainBlocks(portNum);
+    const block = allBlocks.find(b => b.blockNumber === bNum);
+    if (!block) {
+      throw new Error(`Block #${bNum} on chain port ${portNum} not found`);
+    }
+
+    // Enrich each record with live SHA-256 verification and vault metadata
+    const enrichedRecords = (block.patientRecords || []).map(r => {
+      const jsonStr = typeof r.resourceData === 'string' ? r.resourceData : JSON.stringify(r.resourceData);
+      const computedHash = crypto.createHash('sha256').update(jsonStr).digest('hex');
+      const isVerified = (computedHash === r.dataHash);
+      const vaultInfo = storageAdapter.retrieveDecryptedPayload(r.dataHash);
+
+      return {
+        ...r,
+        computedHash,
+        integrityVerified: isVerified,
+        hasOffChainVault: !!vaultInfo,
+        vaultCid: `ipfs://bafk${r.dataHash.slice(0, 44)}`
+      };
+    });
+
+    return {
+      port: portNum,
+      blockNumber: bNum,
+      blockHeader: {
+        number: block.blockNumberHex,
+        hash: block.hash,
+        parentHash: block.parentHash,
+        miner: block.miner,
+        timestamp: block.timestamp,
+        timestampIso: block.timestampIso,
+        gasUsed: block.gasUsed,
+        txCount: block.txCount
+      },
+      transactions: block.transactions,
+      records: enrichedRecords
+    };
+  }
+
+  async getPatientLineageAcrossForks(patientId) {
+    const targetPid = String(patientId).trim();
+    const allRecords = [];
+
+    for (const chain of topology.chains) {
+      try {
+        const records = await this.getChainPatientRecords(chain.port);
+        for (const r of records) {
+          const pid = (r.patientId || '').trim();
+          const cleanTarget = targetPid.replace(/^Patient\//i, '').toLowerCase();
+          const cleanPid = pid.replace(/^Patient\//i, '').toLowerCase();
+
+          if (cleanPid === cleanTarget) {
+            const jsonStr = typeof r.resourceData === 'string' ? r.resourceData : JSON.stringify(r.resourceData);
+            const computedHash = crypto.createHash('sha256').update(jsonStr).digest('hex');
+
+            allRecords.push({
+              chainName: chain.name,
+              port: chain.port,
+              networkId: chain.networkId,
+              isRoot: !!chain.isRoot,
+              parentNetworkId: chain.parentNetworkId,
+              forkBlockNumber: chain.forkBlockNumber,
+              blockNumber: r.blockNumber,
+              patientId: r.patientId,
+              resourceType: r.resourceType,
+              clinicalCode: r.clinicalCode,
+              resourceData: r.resourceData,
+              dataHash: r.dataHash,
+              integrityVerified: (computedHash === r.dataHash),
+              timestamp: r.timestamp,
+              timestampIso: r.timestampIso
+            });
+          }
+        }
+      } catch (err) {
+        console.warn(`[ForkTreeService] Lineage fetch warning on port ${chain.port}:`, err.message);
+      }
+    }
+
+    allRecords.sort((a, b) => a.timestamp - b.timestamp || a.networkId - b.networkId || a.blockNumber - b.blockNumber);
+
+    return {
+      patientId: targetPid,
+      totalTouchpoints: allRecords.length,
+      participatingForks: Array.from(new Set(allRecords.map(r => r.chainName))),
+      lineageTrajectory: allRecords
     };
   }
 

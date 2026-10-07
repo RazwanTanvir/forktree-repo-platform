@@ -1,0 +1,93 @@
+\documentclass[lettersize,journal]{IEEEtran}
+
+% Standard Mathematical & Algorithmic Packages matching IEEE Template
+\usepackage{amsmath,amsfonts,amssymb,amsthm}
+\usepackage{algorithmic}
+\usepackage{algorithm}
+\usepackage{array}
+\usepackage[caption=false,font=normalsize,labelfont=sf,textfont=sf]{subfig}
+\usepackage{textcomp}
+\usepackage{stfloats}
+\usepackage{url}
+\usepackage{verbatim}
+\usepackage{graphicx}
+\usepackage{cite}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{tabularx}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{hyperref}
+
+\usetikzlibrary{shapes,arrows.meta,positioning,fit,calc,backgrounds,shadows}
+
+% Hyphenation definitions
+\hyphenation{op-tical net-works semi-conduc-tor IEEE-Xplore Block-chain Fork-Tree Inter-oper-ability}
+
+% Theorem Environments
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{corollary}{Corollary}
+\newtheorem{proposition}{Proposition}
+
+% Hyperref Setup
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!80!black,
+    citecolor=green!60!black,
+    urlcolor=blue!90!black
+}
+
+\begin{document}
+
+\title{A Federated Fork-Tree Blockchain Architecture with On-Chain Shared Consortium Governance for Resilient, Privacy-Preserving Healthcare Interoperability and Immutable Auditability}
+
+\author{Razwan Tanvir,~\IEEEmembership{Senior Member,~IEEE}%
+\thanks{Razwan Tanvir is with the Department of Computer Science \& Health Informatics, (e-mail: razwan.tanvir@example.edu).}%
+\thanks{Manuscript received October 3, 2026; revised October 4, 2026.}}
+
+% The paper headers
+\markboth{IEEE Transactions on Services Computing,~Vol.~XX, No.~X, October~2026}%
+{Tanvir: A Federated Fork-Tree Blockchain Architecture with On-Chain Shared Consortium Governance}
+
+\IEEEpubid{0000--0000/00\$00.00~\copyright~2026 IEEE}
+% Remember, if you use this you must call \IEEEpubidadjcol in the second
+% column for its text to clear the IEEEpubid mark.
+
+\maketitle
+
+% Modular Section Inputs
+\input{sections/00_abstract.tex}
+\input{sections/01_introduction.tex}
+\input{sections/02_related_work.tex}
+\input{sections/03_system_architecture.tex}
+\input{sections/04_governance_consensus.tex}
+\input{sections/05_rbac_consent.tex}
+\input{sections/06_fhir_messaging.tex}
+\input{sections/07_traversal_algorithms.tex}
+\input{sections/08_security_threat_model.tex}
+\input{sections/09_empirical_evaluation.tex}
+\input{sections/10_discussion_policy.tex}
+\input{sections/11_limitations_future.tex}
+\input{sections/12_conclusion.tex}
+
+\section*{Acknowledgment}
+The author expresses sincere appreciation to the clinical informatics specialists, hospital administrative stakeholders, and distributed systems colleagues whose rigorous insights helped shape the architectural parameters and regulatory models of this research.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\newpage
+
+\section{Biography Section}
+
+\begin{IEEEbiographynophoto}{Razwan Tanvir}
+(Senior Member, IEEE) received his graduate training in computer science and health informatics. His research focuses on decentralized architectures, multi-chain distributed ledger topologies, privacy-preserving cryptographic protocols, and semantic interoperability in healthcare ecosystems. He has contributed to open-source biomedical informatics platforms and published in the areas of distributed consensus, HL7 FHIR integration, and statutory compliance under HIPAA and GDPR. He currently leads research initiatives on autonomous multi-agent systems and federated clinical data governance.
+\end{IEEEbiographynophoto}
+
+\vfill
+
+\end{document}

@@ -9,7 +9,7 @@
     "11102": {
       "networkId": 11102,
       "port": 8546,
-      "name": "Root Blockchain",
+      "name": "Master Patient Index (MPI Root)",
       "address": "0x271DA3B9B79c697c261275c7cfeE736daAcDa10C",
       "contractType": "BlockData",
       "rpcUrl": "http://localhost:8546"
@@ -17,7 +17,7 @@
     "11103": {
       "networkId": 11103,
       "port": 8547,
-      "name": "Fork Alpha (from 11102)",
+      "name": "Metro General Hospital",
       "address": "0x271DA3B9B79c697c261275c7cfeE736daAcDa10C",
       "contractType": "BlockData",
       "rpcUrl": "http://localhost:8547"
@@ -25,7 +25,7 @@
     "11104": {
       "networkId": 11104,
       "port": 8548,
-      "name": "Fork Beta (from 11102)",
+      "name": "BioLabs Diagnostic Center",
       "address": "0x271DA3B9B79c697c261275c7cfeE736daAcDa10C",
       "contractType": "BlockData",
       "rpcUrl": "http://localhost:8548"
@@ -33,7 +33,7 @@
     "11105": {
       "networkId": 11105,
       "port": 8549,
-      "name": "Fork Gamma (from 11103)",
+      "name": "Cardio Specialty Clinic",
       "address": "0x271DA3B9B79c697c261275c7cfeE736daAcDa10C",
       "contractType": "BlockData",
       "rpcUrl": "http://localhost:8549"
@@ -41,7 +41,7 @@
     "11106": {
       "networkId": 11106,
       "port": 8550,
-      "name": "Fork Delta (from 11103)",
+      "name": "Emergency Care Center",
       "address": "0x271DA3B9B79c697c261275c7cfeE736daAcDa10C",
       "contractType": "BlockData",
       "rpcUrl": "http://localhost:8550"
@@ -49,18 +49,10 @@
     "11107": {
       "networkId": 11107,
       "port": 8551,
-      "name": "Fork Epsilon (from 11104)",
+      "name": "Consortium Pharmacy Network",
       "address": "0x271DA3B9B79c697c261275c7cfeE736daAcDa10C",
       "contractType": "BlockData",
       "rpcUrl": "http://localhost:8551"
-    },
-    "11108": {
-      "networkId": 11108,
-      "port": 8552,
-      "name": "Fork Zeta - Oncology Clinic",
-      "address": "0x271DA3B9B79c697c261275c7cfeE736daAcDa10C",
-      "contractType": "BlockData",
-      "rpcUrl": "http://localhost:8552"
     }
   }
 }

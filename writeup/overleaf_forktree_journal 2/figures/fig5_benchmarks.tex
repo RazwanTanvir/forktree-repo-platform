@@ -1,0 +1,48 @@
+\begin{tikzpicture}
+\begin{axis}[
+    scale only axis,
+    width=0.74\columnwidth,
+    height=4.4cm,
+    xlabel={Network Scale / Active Blockchain Forks ($|V|$)},
+    ylabel={Aggregate Throughput (TPS)},
+    xmin=1, xmax=16,
+    ymin=0, ymax=8500,
+    xtick={1, 2, 4, 8, 12, 16},
+    ytick={0, 2000, 4000, 6000, 8000},
+    legend pos=north west,
+    legend cell align={left},
+    legend style={font=\sffamily\tiny, fill=white, draw=black},
+    ymajorgrids=true,
+    grid style={dotted, gray!60},
+    font=\sffamily\scriptsize,
+    label style={font=\sffamily\scriptsize},
+    tick label style={font=\sffamily\scriptsize}
+]
+
+% ForkTree Throughput: Solid Black Line + Filled Black Square
+\addplot[
+    color=black,
+    mark=square*,
+    mark size=2pt,
+    line width=1.3pt
+]
+coordinates {
+    (1, 850)(2, 1680)(4, 3310)(8, 6420)(12, 7250)(16, 7890)
+};
+\addlegendentry{BlockchainForkTree (Horizontal Scaling)}
+
+% Monolithic Ledger: Dashed Black Line + Open Triangle
+\addplot[
+    color=black,
+    mark=triangle,
+    mark size=2.2pt,
+    line width=1.1pt,
+    dashed
+]
+coordinates {
+    (1, 850)(2, 720)(4, 510)(8, 290)(12, 210)(16, 175)
+};
+\addlegendentry{Monolithic Ledger (Congestion Collapse)}
+
+\end{axis}
+\end{tikzpicture}

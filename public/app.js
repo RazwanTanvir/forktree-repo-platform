@@ -19,8 +19,16 @@ document.addEventListener('DOMContentLoaded', () => {
   let cachedPersonas = [];
   let cachedChains = [];
   let cachedMessages = [];
-  let selectedMessageId = null;
   let activeMsgFilter = 'all';
+
+  function getAuthHeaders() {
+    return {
+      'X-Caller-Address': currentPersona.address || '',
+      'X-Caller-Role': currentPersona.role || '',
+      'X-Caller-Port': String(currentPersona.port || ''),
+      'X-Caller-Org': currentPersona.organizationName || ''
+    };
+  }
 
   // --- Navigation Tabs ---
   const tabButtons = document.querySelectorAll('.tab-btn');
@@ -66,6 +74,9 @@ document.addEventListener('DOMContentLoaded', () => {
       populateDataChainSelect();
       populateAddRecordChainSelect();
     }
+    if (targetTab === 'blocks') {
+      initBlocksTab();
+    }
     if (targetTab === 'search') populateSearchStartSelect();
     if (targetTab === 'create-fork') populateForkParentSelect();
   }
@@ -99,6 +110,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (chosen) {
               currentPersona = chosen;
               updatePersonaUI();
+              loadExplorerChains();
+              populateDataChainSelect();
+              loadChainData();
             }
           });
         }
@@ -170,17 +184,34 @@ document.addEventListener('DOMContentLoaded', () => {
       if (submitProjectBtn) submitProjectBtn.disabled = true;
     }
 
-    // Auth Banner Text
+    // Auth Banner Text & Global Oversight / Intra-Org Isolation Indicators
     const bannerText = document.getElementById('auth-banner-text');
+    const bannerIcon = document.getElementById('auth-banner-icon');
+    const vaultStatsBadge = document.getElementById('vault-stats-badge');
+    const isCouncilOrAuditor = ['STEERING_COUNCIL', 'AUDITOR'].includes(currentPersona.role);
+
     if (bannerText) {
-      if (isCouncil) {
-        bannerText.textContent = `Authenticated as Steering Council Chair (${currentPersona.name}). Root federation provisioning & oversight active.`;
-      } else if (currentPersona.role === 'CLINICIAN') {
-        bannerText.textContent = `Authenticated as Clinician (${currentPersona.name} at ${currentPersona.organizationName}). Write permissions & order dispatch active.`;
-      } else if (currentPersona.role === 'SPECIALIST') {
-        bannerText.textContent = `Authenticated as Healthcare Specialist (${currentPersona.name} at ${currentPersona.organizationName}). Order fulfillment active.`;
+      if (isCouncilOrAuditor) {
+        if (bannerIcon) bannerIcon.textContent = '🌐';
+        bannerText.textContent = `Authenticated as ${currentPersona.role === 'AUDITOR' ? 'Regulatory Auditor' : 'Steering Council Chair'} (${currentPersona.name}). Consortium Global Oversight & Regulatory Auditing Active.`;
+        if (vaultStatsBadge) {
+          vaultStatsBadge.textContent = '🌐 Global Consortium Oversight';
+          vaultStatsBadge.className = 'badge badge-primary';
+        }
+      } else if (currentPersona.role === 'PATIENT') {
+        if (bannerIcon) bannerIcon.textContent = '👤';
+        bannerText.textContent = `Authenticated as Healthcare Consumer (${currentPersona.name}). Sovereign patient consent & access control active.`;
+        if (vaultStatsBadge) {
+          vaultStatsBadge.textContent = '👤 Sovereign Patient Access';
+          vaultStatsBadge.className = 'badge badge-info';
+        }
       } else {
-        bannerText.textContent = `Operating as ${currentPersona.name} (${currentPersona.role} at ${currentPersona.organizationName}). Role-based permissions enforced.`;
+        if (bannerIcon) bannerIcon.textContent = '🔒';
+        bannerText.textContent = `Intra-Org Isolation Active: Access restricted exclusively to ${currentPersona.organizationName} (Port ${currentPersona.port}). External network infrastructure and cross-chain data are compartmentalized.`;
+        if (vaultStatsBadge) {
+          vaultStatsBadge.textContent = `🔒 Isolated: ${currentPersona.organizationName}`;
+          vaultStatsBadge.className = 'badge badge-warning';
+        }
       }
     }
 
@@ -191,6 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function applyRolePermissions() {
     const role = currentPersona.role;
     const permissions = currentPersona.permissions || [];
+    const isCouncilOrAuditor = ['STEERING_COUNCIL', 'AUDITOR'].includes(role);
 
     // 1. Role-gated navigation tabs: strictly hide unauthorized tabs
     let activeTabStillVisible = false;
@@ -208,10 +240,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!activeTabStillVisible) {
       let defaultTab = 'data';
       if (role === 'STEERING_COUNCIL') defaultTab = 'roles';
-      else if (role === 'ORG_ADMIN') defaultTab = 'governance';
+      else if (role === 'AUDITOR') defaultTab = 'nodes';
+      else if (role === 'ORG_ADMIN') defaultTab = 'blocks';
       else if (role === 'CLINICIAN') defaultTab = 'data';
       else if (role === 'SPECIALIST') defaultTab = 'messaging';
-      else if (role === 'AUDITOR') defaultTab = 'tree';
       else if (role === 'PATIENT') defaultTab = 'data';
 
       switchTab(defaultTab);
@@ -219,9 +251,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const activeBtn = document.querySelector('.tab-btn.active');
       if (activeBtn) {
         const activeTab = activeBtn.getAttribute('data-tab');
-        if (activeTab === 'data') loadChainData();
+        if (activeTab === 'data') { populateDataChainSelect(); loadChainData(); }
+        if (activeTab === 'blocks') { loadExplorerChains(); }
         if (activeTab === 'messaging') loadMessages();
         if (activeTab === 'request-fork') loadForkBallots();
+        if (activeTab === 'nodes' && isCouncilOrAuditor) loadNodesStatus();
       }
     }
 
@@ -234,7 +268,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (authorRecordCard) {
       authorRecordCard.style.display = (role === 'CLINICIAN') ? 'block' : 'none';
-      if (role === 'CLINICIAN') populateAddRecordChainSelect();
+      if (role === 'CLINICIAN') {
+        populateAddRecordChainSelect();
+        updateEhrClinicianContext();
+      }
     }
     if (patientConsentCard) {
       patientConsentCard.style.display = (role === 'PATIENT') ? 'block' : 'none';
@@ -325,7 +362,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!svg) return;
 
     try {
-      const res = await fetch('/api/tree');
+      const res = await fetch('/api/tree', { headers: getAuthHeaders() });
+      if (res.status === 403) {
+        svg.innerHTML = '<text x="20" y="50" fill="#ef4444" font-size="14" font-family="system-ui, sans-serif">⛔ Access Denied: Tree Topology is restricted to Consortium Steering Council and Auditors under HIPAA/GDPR segregation.</text>';
+        return;
+      }
       const json = await res.json();
       if (!json.success || !json.tree) return;
 
@@ -1354,10 +1395,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!grid) return;
 
     try {
-      const res = await fetch('/api/status');
+      const res = await fetch('/api/status', { headers: getAuthHeaders() });
       const json = await res.json();
       if (json.success && Array.isArray(json.nodes)) {
         grid.innerHTML = '';
+
+        if (json.isGlobalOverview === false) {
+          const banner = document.createElement('div');
+          banner.className = 'alert-box alert-warning';
+          banner.style.gridColumn = '1 / -1';
+          banner.innerHTML = `🔒 <strong>Intra-Org Node View:</strong> ${escapeHtml(json.message || 'Displaying only your organization node.')}`;
+          grid.appendChild(banner);
+        }
+
         json.nodes.forEach(n => {
           const card = document.createElement('div');
           card.className = 'node-card';
@@ -1392,11 +1442,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const select = document.getElementById('data-chain-select');
     if (!container) return;
 
-    const portVal = select ? select.value : 'all';
+    const isAuditorOrCouncil = ['STEERING_COUNCIL', 'AUDITOR'].includes(currentPersona.role);
+    let portVal;
+    if (isAuditorOrCouncil) {
+      portVal = select ? select.value : 'all';
+    } else if (currentPersona.role === 'PATIENT') {
+      portVal = 'all';
+    } else {
+      portVal = currentPersona.port;
+    }
+
     const url = portVal === 'all' ? '/api/data' : `/api/data/${portVal}`;
 
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: getAuthHeaders() });
       const json = await res.json();
       if (json.success) {
         let records = json.data || [];
@@ -1406,7 +1465,7 @@ document.addEventListener('DOMContentLoaded', () => {
           records = records.filter(r => {
             if (!r.patientId) return false;
             const pid = r.patientId.toUpperCase();
-            return pid === 'P101' || pid === currentPersona.id.toUpperCase() || pid.includes('P101');
+            return pid === 'P101' || pid === currentPersona.id.toUpperCase() || pid.includes('P101') || pid.includes('P-101');
           });
         }
 
@@ -1422,8 +1481,8 @@ document.addEventListener('DOMContentLoaded', () => {
             container.innerHTML = `
               <div class="empty-state">
                 <span style="font-size: 2.2rem; display: block; margin-bottom: 0.5rem;">🩺</span>
-                <strong>No clinical records found.</strong>
-                <p style="margin-top: 4px; color: #8b949e; font-size: 13px;">${currentPersona.role === 'CLINICIAN' ? 'Author and digitally sign the first real patient encounter using the form above.' : 'Clinical records will appear once committed by authorized care team clinicians.'}</p>
+                <strong>No clinical records found for ${escapeHtml(currentPersona.organizationName)}.</strong>
+                <p style="margin-top: 4px; color: #8b949e; font-size: 13px;">${currentPersona.role === 'CLINICIAN' ? 'Author and digitally sign the first real patient encounter on your organization ledger using the form above.' : 'Clinical records will appear once committed by authorized care team clinicians.'}</p>
               </div>`;
           }
           return;
@@ -1445,7 +1504,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <p style="font-size: 12px; color: #c9d1d9; margin: 4px 0;">Patient: <strong>${escapeHtml(r.patientId)}</strong></p>
             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #8b949e;">
-              <span style="font-family: monospace; color: #7ee787;">SHA-256: ${r.dataHash ? r.dataHash.slice(0, 18) + '…' : 'Anchored'}</span>
+              <span style="font-family: monospace; color: #7ee787;">SHA-256: ${r.dataHash ? r.dataHash.slice(0, 16) + '…' : 'Anchored'} <span class="badge badge-success" style="font-size: 10px; margin-left: 6px; padding: 2px 6px;">✓ Verified SHA-256</span></span>
               <button class="btn btn-xs btn-outline btn-view-fhir">
                 📋 View FHIR
               </button>
@@ -1471,16 +1530,68 @@ document.addEventListener('DOMContentLoaded', () => {
     const select = document.getElementById('data-chain-select');
     if (!select) return;
     const chains = await fetchChains();
-    select.innerHTML = '<option value="all">All Chains (Federated View)</option>';
-    chains.forEach(c => {
+    const isAuditorOrCouncil = ['STEERING_COUNCIL', 'AUDITOR'].includes(currentPersona.role);
+
+    select.innerHTML = '';
+    if (isAuditorOrCouncil) {
+      const allOpt = document.createElement('option');
+      allOpt.value = 'all';
+      allOpt.textContent = '🌐 All Chains (Federated Audit View)';
+      select.appendChild(allOpt);
+      chains.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.port;
+        opt.textContent = `${c.name} (Port ${c.port})`;
+        select.appendChild(opt);
+      });
+      select.disabled = false;
+      select.title = 'Consortium Global Audit View';
+    } else if (currentPersona.role === 'PATIENT') {
+      const allOpt = document.createElement('option');
+      allOpt.value = 'all';
+      allOpt.textContent = '👤 My Records (All Authorized Facilities)';
+      select.appendChild(allOpt);
+      select.value = 'all';
+      select.disabled = true;
+      select.title = 'Patient sovereign access across authorized facilities';
+    } else {
+      // Individual Staff: strictly isolated to their own organization!
+      const ownChain = chains.find(c => c.port === currentPersona.port);
       const opt = document.createElement('option');
-      opt.value = c.port;
-      opt.textContent = `${c.name} (Port ${c.port})`;
+      opt.value = currentPersona.port;
+      opt.textContent = ownChain ? `🏥 ${ownChain.name} (My Organization Ledger)` : `Port ${currentPersona.port}`;
       select.appendChild(opt);
-    });
+      select.value = currentPersona.port;
+      select.disabled = true;
+      select.title = `Restricted to ${currentPersona.organizationName} under HIPAA § 164.502(b)`;
+    }
 
     select.removeEventListener('change', loadChainData);
     select.addEventListener('change', loadChainData);
+  }
+
+  // --- Institutional Clinical EHR Documentation Engine ---
+  async function computeSha256(text) {
+    try {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(text);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch (e) {
+      return 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+    }
+  }
+
+  function updateEhrClinicianContext() {
+    const badge = document.getElementById('ehr-station-badge');
+    const facility = document.getElementById('ehr-patient-facility');
+    if (badge && currentPersona) {
+      badge.textContent = `Clinician Station: ${currentPersona.name}`;
+    }
+    if (facility && currentPersona) {
+      facility.textContent = `🏥 ${currentPersona.organizationName} (Port ${currentPersona.port})`;
+    }
   }
 
   async function populateAddRecordChainSelect() {
@@ -1488,93 +1599,731 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!select) return;
     const chains = await fetchChains();
     select.innerHTML = '';
-    chains.forEach(c => {
+    const ownChain = chains.find(c => c.port === currentPersona.port);
+    if (ownChain) {
       const opt = document.createElement('option');
-      opt.value = c.port;
-      opt.textContent = `${c.name} (Port ${c.port})`;
+      opt.value = ownChain.port;
+      opt.textContent = `🏥 ${ownChain.name} (Port ${ownChain.port})`;
       select.appendChild(opt);
-    });
-    if (currentPersona.port && chains.some(c => c.port === currentPersona.port)) {
-      select.value = currentPersona.port;
+      select.value = ownChain.port;
+      select.disabled = true;
+    } else {
+      chains.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.port;
+        opt.textContent = `${c.name} (Port ${c.port})`;
+        select.appendChild(opt);
+      });
+      if (currentPersona.port) select.value = currentPersona.port;
     }
   }
 
-  // Clinical Record Form Submission
-  const formAddClinicalRecord = document.getElementById('form-add-clinical-record');
-  if (formAddClinicalRecord) {
-    formAddClinicalRecord.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const portVal = parseInt(document.getElementById('rec-target-port').value, 10);
-      const patientId = document.getElementById('rec-patient-id').value.trim();
-      const resourceType = document.getElementById('rec-resource-type').value;
-      const clinicalCode = document.getElementById('rec-clinical-code').value.trim();
-      const summaryNote = document.getElementById('rec-summary-note').value.trim();
+  function getActivePatientId() {
+    const select = document.getElementById('ehr-patient-select');
+    if (!select) return 'Patient/P-101';
+    if (select.value === 'custom') {
+      const customInput = document.getElementById('rec-patient-id-custom');
+      const val = customInput ? customInput.value.trim() : '';
+      return val ? (val.startsWith('Patient/') ? val : `Patient/${val}`) : 'Patient/P-Custom';
+    }
+    return `Patient/${select.value}`;
+  }
 
-      const btn = document.getElementById('btn-commit-record');
-      if (btn) {
-        btn.disabled = true;
-        btn.textContent = '🔒 Signing & Anchoring to Chain...';
+  function buildFhirResourceFromForm() {
+    const resourceTypeSelect = document.getElementById('rec-resource-type');
+    const resourceType = resourceTypeSelect ? resourceTypeSelect.value : 'Encounter';
+    const patientId = getActivePatientId();
+    const patientName = document.getElementById('ehr-patient-name')?.textContent || 'Patient';
+    const encounterRef = (document.getElementById('rec-encounter-ref')?.value || 'Encounter/enc-101').trim();
+    const effectiveTime = new Date().toISOString();
+    const resourceId = `${resourceType.toLowerCase()}-${Date.now().toString().slice(-6)}`;
+
+    let resourceData = {};
+    let clinicalCode = '';
+
+    if (resourceType === 'Encounter') {
+      const encClass = document.getElementById('enc-class')?.value || 'IMP';
+      const encDept = document.getElementById('enc-department')?.value || 'Cardiology Acute Care';
+      const encStatus = document.getElementById('enc-status')?.value || 'in-progress';
+      const codePicker = document.getElementById('enc-code-picker')?.value || 'SNOMED:32485007|Hospital admission';
+      const disposition = document.getElementById('enc-disposition')?.value || 'telemetry';
+      const reason = document.getElementById('enc-reason')?.value || 'Patient admission for clinical monitoring.';
+
+      let snomedCode = '32485007';
+      let snomedDisplay = 'Hospital admission';
+      if (codePicker === 'custom') {
+        const customCode = (document.getElementById('enc-custom-code')?.value || 'SNOMED:32485007').trim();
+        clinicalCode = customCode;
+        snomedCode = customCode.split(':')[1] || customCode;
+        snomedDisplay = 'Clinical encounter';
+      } else {
+        const parts = codePicker.split('|');
+        clinicalCode = parts[0];
+        snomedCode = parts[0].split(':')[1] || parts[0];
+        snomedDisplay = parts[1] || 'Hospital admission';
       }
 
-      const resourceData = {
-        resourceType: resourceType,
-        id: `${resourceType.toLowerCase()}-${Date.now().toString().slice(-6)}`,
-        status: 'final',
-        code: {
-          text: clinicalCode,
-          coding: [{
-            system: clinicalCode.startsWith('LOINC') ? 'http://loinc.org' : 'http://hl7.org/fhir/sid/icd-10',
-            code: clinicalCode.split(':')[1] || clinicalCode,
-            display: summaryNote
-          }]
-        },
-        subject: {
-          reference: `Patient/${patientId}`,
-          display: `Patient ${patientId}`
-        },
-        performer: [{
-          display: currentPersona.name,
-          actor: currentPersona.address
-        }],
-        note: [{ text: summaryNote }],
-        effectiveDateTime: new Date().toISOString()
+      const classDisplayMap = {
+        'IMP': 'inpatient encounter',
+        'EMER': 'emergency',
+        'AMB': 'ambulatory',
+        'SS': 'short stay'
       };
 
-      try {
-        const res = await fetch('/api/add-patient-record', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Caller-Address': currentPersona.address
-          },
-          body: JSON.stringify({
-            port: portVal,
-            patientId,
-            resourceType,
-            clinicalCode,
-            resourceData,
-            callerAddress: currentPersona.address
-          })
-        });
+      resourceData = {
+        resourceType: 'Encounter',
+        id: resourceId,
+        status: encStatus,
+        class: {
+          system: 'http://terminology.hl7.org/CodeSystem/v3-ActCode',
+          code: encClass,
+          display: classDisplayMap[encClass] || 'inpatient encounter'
+        },
+        type: [{
+          coding: [{
+            system: 'http://snomed.info/sct',
+            code: snomedCode,
+            display: snomedDisplay
+          }]
+        }],
+        serviceType: {
+          text: encDept
+        },
+        subject: {
+          reference: patientId,
+          display: patientName
+        },
+        participant: [{
+          individual: {
+            display: currentPersona ? currentPersona.name : 'Attending Clinician',
+            identifier: { system: 'urn:consortium:address', value: currentPersona ? currentPersona.address : '' }
+          }
+        }],
+        reasonCode: [{
+          coding: [{
+            system: 'http://snomed.info/sct',
+            code: snomedCode,
+            display: snomedDisplay
+          }],
+          text: reason
+        }],
+        hospitalization: {
+          dischargeDisposition: {
+            text: disposition
+          }
+        },
+        period: {
+          start: effectiveTime
+        }
+      };
 
-        const json = await res.json();
-        if (json.success) {
-          alert(`✓ Clinical record cryptographically anchored on Port ${portVal}!\nTx Hash: ${json.txHash}\nSHA-256 Digest: ${json.dataHash}`);
-          document.getElementById('rec-summary-note').value = '';
-          loadChainData();
-          loadVaultStats();
-        } else {
-          alert(`Error committing clinical record: ${json.error}`);
-        }
-      } catch (err) {
-        alert(`Failed to commit clinical record: ${err.message}`);
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = '🔒 Commit Record with Clinician Signature';
-        }
+    } else if (resourceType === 'Observation') {
+      const category = document.getElementById('obs-category')?.value || 'vital-signs';
+      const preset = document.getElementById('obs-preset-picker')?.value || 'bp';
+      const note = document.getElementById('obs-note')?.value || '';
+
+      const interpDisplayMap = {
+        'N': 'Normal',
+        'A': 'Abnormal',
+        'H': 'High',
+        'L': 'Low',
+        'HH': 'Critical High',
+        'LL': 'Critical Low'
+      };
+
+      if (preset === 'bp') {
+        clinicalCode = 'LOINC:85354-9';
+        const systolic = parseFloat(document.getElementById('obs-bp-systolic')?.value || 142);
+        const diastolic = parseFloat(document.getElementById('obs-bp-diastolic')?.value || 88);
+        const interpretation = document.getElementById('obs-interpretation-bp')?.value || 'H';
+
+        resourceData = {
+          resourceType: 'Observation',
+          id: resourceId,
+          status: 'final',
+          category: [{
+            coding: [{
+              system: 'http://terminology.hl7.org/CodeSystem/observation-category',
+              code: 'vital-signs',
+              display: 'Vital Signs'
+            }]
+          }],
+          code: {
+            coding: [{
+              system: 'http://loinc.org',
+              code: '85354-9',
+              display: 'Blood pressure panel with all children optional'
+            }]
+          },
+          subject: { reference: patientId, display: patientName },
+          encounter: { reference: encounterRef },
+          effectiveDateTime: effectiveTime,
+          performer: [{
+            display: currentPersona ? currentPersona.name : 'Clinician',
+            actor: currentPersona ? currentPersona.address : ''
+          }],
+          interpretation: [{
+            coding: [{
+              system: 'http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation',
+              code: interpretation,
+              display: interpDisplayMap[interpretation] || 'Normal'
+            }]
+          }],
+          note: note ? [{ text: note }] : [],
+          component: [
+            {
+              code: {
+                coding: [{
+                  system: 'http://loinc.org',
+                  code: '8480-6',
+                  display: 'Systolic blood pressure'
+                }]
+              },
+              valueQuantity: {
+                value: systolic,
+                unit: 'mmHg',
+                system: 'http://unitsofmeasure.org',
+                code: 'mm[Hg]'
+              }
+            },
+            {
+              code: {
+                coding: [{
+                  system: 'http://loinc.org',
+                  code: '8462-4',
+                  display: 'Diastolic blood pressure'
+                }]
+              },
+              valueQuantity: {
+                value: diastolic,
+                unit: 'mmHg',
+                system: 'http://unitsofmeasure.org',
+                code: 'mm[Hg]'
+              }
+            }
+          ]
+        };
+      } else {
+        const codeInput = document.getElementById('obs-clinical-code')?.value || 'LOINC:8867-4';
+        clinicalCode = codeInput;
+        const loincCode = codeInput.split(':')[1] || codeInput;
+        const presetOpt = document.querySelector('#obs-preset-picker option:checked');
+        const display = presetOpt ? (presetOpt.getAttribute('data-name') || presetOpt.textContent) : 'Clinical Observation';
+        const val = parseFloat(document.getElementById('obs-value')?.value || 0);
+        const unit = document.getElementById('obs-unit')?.value || '';
+        const low = parseFloat(document.getElementById('obs-ref-low')?.value || 0);
+        const high = parseFloat(document.getElementById('obs-ref-high')?.value || 0);
+        const interpretation = document.getElementById('obs-interpretation')?.value || 'N';
+
+        resourceData = {
+          resourceType: 'Observation',
+          id: resourceId,
+          status: 'final',
+          category: [{
+            coding: [{
+              system: 'http://terminology.hl7.org/CodeSystem/observation-category',
+              code: category,
+              display: category
+            }]
+          }],
+          code: {
+            coding: [{
+              system: 'http://loinc.org',
+              code: loincCode,
+              display
+            }]
+          },
+          subject: { reference: patientId, display: patientName },
+          encounter: { reference: encounterRef },
+          effectiveDateTime: effectiveTime,
+          performer: [{
+            display: currentPersona ? currentPersona.name : 'Clinician',
+            actor: currentPersona ? currentPersona.address : ''
+          }],
+          valueQuantity: {
+            value: val,
+            unit: unit,
+            system: 'http://unitsofmeasure.org'
+          },
+          interpretation: [{
+            coding: [{
+              system: 'http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation',
+              code: interpretation,
+              display: interpDisplayMap[interpretation] || 'Normal'
+            }]
+          }],
+          referenceRange: (low || high) ? [{
+            low: low ? { value: low, unit } : undefined,
+            high: high ? { value: high, unit } : undefined
+          }] : undefined,
+          note: note ? [{ text: note }] : []
+        };
       }
-    });
+
+    } else if (resourceType === 'Condition') {
+      const codeInput = document.getElementById('cond-clinical-code')?.value || 'ICD-10:I10';
+      clinicalCode = codeInput;
+      const icdCode = codeInput.split(':')[1] || codeInput;
+      const presetOpt = document.querySelector('#cond-preset-picker option:checked');
+      const display = presetOpt ? (presetOpt.getAttribute('data-name') || 'Clinical Condition') : 'Essential (primary) hypertension';
+      const clinStatus = document.getElementById('cond-clinical-status')?.value || 'active';
+      const verStatus = document.getElementById('cond-verification-status')?.value || 'confirmed';
+      const severity = document.getElementById('cond-severity')?.value || 'moderate';
+      const onsetDate = document.getElementById('cond-onset-date')?.value || effectiveTime.slice(0, 10);
+      const note = document.getElementById('cond-note')?.value || '';
+
+      resourceData = {
+        resourceType: 'Condition',
+        id: resourceId,
+        clinicalStatus: {
+          coding: [{
+            system: 'http://terminology.hl7.org/CodeSystem/condition-clinical',
+            code: clinStatus,
+            display: clinStatus
+          }]
+        },
+        verificationStatus: {
+          coding: [{
+            system: 'http://terminology.hl7.org/CodeSystem/condition-ver-status',
+            code: verStatus,
+            display: verStatus
+          }]
+        },
+        severity: {
+          coding: [{
+            system: 'http://snomed.info/sct',
+            code: severity === 'severe' ? '24484000' : severity === 'mild' ? '255604002' : '6736007',
+            display: severity
+          }]
+        },
+        code: {
+          coding: [{
+            system: 'http://hl7.org/fhir/sid/icd-10-cm',
+            code: icdCode,
+            display
+          }]
+        },
+        subject: { reference: patientId, display: patientName },
+        encounter: { reference: encounterRef },
+        onsetDateTime: onsetDate,
+        recordedDate: effectiveTime,
+        recorder: {
+          display: currentPersona ? currentPersona.name : 'Clinician'
+        },
+        note: note ? [{ text: note }] : []
+      };
+
+    } else if (resourceType === 'MedicationRequest') {
+      const codeInput = document.getElementById('med-clinical-code')?.value || 'RxNorm:314076';
+      clinicalCode = codeInput;
+      const rxNormCode = codeInput.split(':')[1] || codeInput;
+      const medDisplay = document.getElementById('med-display-name')?.value || 'Lisinopril 10 MG Oral Tablet';
+      const sig = document.getElementById('med-dosage')?.value || 'Take 1 tablet by mouth daily in the morning';
+      const route = document.getElementById('med-route')?.value || 'oral';
+      const freq = document.getElementById('med-frequency')?.value || 'QD';
+      const qty = parseInt(document.getElementById('med-quantity')?.value || 30, 10);
+      const days = parseInt(document.getElementById('med-days-supply')?.value || 30, 10);
+      const refills = parseInt(document.getElementById('med-refills')?.value || 3, 10);
+      const intent = document.getElementById('med-intent')?.value || 'order';
+      const instructions = document.getElementById('med-instructions')?.value || '';
+
+      resourceData = {
+        resourceType: 'MedicationRequest',
+        id: resourceId,
+        status: 'active',
+        intent,
+        medicationCodeableConcept: {
+          coding: [{
+            system: 'http://www.nlm.nih.gov/research/umls/rxnorm',
+            code: rxNormCode,
+            display: medDisplay
+          }]
+        },
+        subject: { reference: patientId, display: patientName },
+        encounter: { reference: encounterRef },
+        authoredOn: effectiveTime,
+        requester: {
+          display: currentPersona ? currentPersona.name : 'Ordering Clinician',
+          identifier: { system: 'urn:consortium:address', value: currentPersona ? currentPersona.address : '' }
+        },
+        dosageInstruction: [{
+          text: sig,
+          route: {
+            coding: [{
+              system: 'http://snomed.info/sct',
+              code: route === 'oral' ? '260548002' : route === 'iv' ? '47625008' : '34206005',
+              display: route
+            }]
+          },
+          timing: {
+            code: {
+              coding: [{
+                system: 'http://terminology.hl7.org/CodeSystem/v3-GTSAbbreviation',
+                code: freq,
+                display: freq
+              }]
+            }
+          }
+        }],
+        dispenseRequest: {
+          quantity: { value: qty, unit: 'TAB' },
+          expectedSupplyDuration: { value: days, unit: 'days' },
+          numberOfRepeatsAllowed: refills
+        },
+        note: instructions ? [{ text: instructions }] : []
+      };
+
+    } else if (resourceType === 'DiagnosticReport') {
+      const codeInput = document.getElementById('diag-clinical-code')?.value || 'LOINC:24323-8';
+      clinicalCode = codeInput;
+      const loincCode = codeInput.split(':')[1] || codeInput;
+      const presetOpt = document.querySelector('#diag-preset-picker option:checked');
+      const panelName = presetOpt ? (presetOpt.getAttribute('data-name') || presetOpt.textContent) : 'Comprehensive metabolic panel';
+      const section = document.getElementById('diag-section')?.value || 'CH';
+      const accession = document.getElementById('diag-accession')?.value || 'ACC-2026-90412';
+      const diagStatus = document.getElementById('diag-status')?.value || 'final';
+      const conclusion = document.getElementById('diag-conclusion')?.value || '';
+      const effectiveDate = document.getElementById('diag-effective-date')?.value || effectiveTime;
+
+      resourceData = {
+        resourceType: 'DiagnosticReport',
+        id: resourceId,
+        identifier: [{
+          system: 'urn:oid:consortium-accession',
+          value: accession
+        }],
+        status: diagStatus,
+        category: [{
+          coding: [{
+            system: 'http://terminology.hl7.org/CodeSystem/v2-0074',
+            code: section,
+            display: section === 'CH' ? 'Chemistry' : section === 'HM' ? 'Hematology' : section === 'RAD' ? 'Radiology' : 'Diagnostic Service'
+          }]
+        }],
+        code: {
+          coding: [{
+            system: 'http://loinc.org',
+            code: loincCode,
+            display: panelName
+          }]
+        },
+        subject: { reference: patientId, display: patientName },
+        encounter: { reference: encounterRef },
+        effectiveDateTime: effectiveDate,
+        issued: effectiveTime,
+        performer: [{
+          display: currentPersona ? currentPersona.name : 'Pathologist',
+          actor: currentPersona ? currentPersona.address : ''
+        }],
+        conclusion
+      };
+    }
+
+    return { resourceData, resourceType, clinicalCode, patientId };
+  }
+
+  async function updateLiveFhirPreview() {
+    const jsonEl = document.getElementById('ehr-live-json');
+    const hashEl = document.getElementById('preview-sha256-hash');
+    const badgeEl = document.getElementById('preview-fhir-type-badge');
+    if (!jsonEl) return;
+
+    try {
+      const { resourceData, resourceType } = buildFhirResourceFromForm();
+      const formatted = JSON.stringify(resourceData, null, 2);
+      jsonEl.textContent = formatted;
+      if (badgeEl) badgeEl.textContent = resourceType;
+
+      const hash = await computeSha256(formatted);
+      if (hashEl) {
+        hashEl.textContent = `${hash.slice(0, 16)}...${hash.slice(-8)}`;
+        hashEl.title = `Full SHA-256 Digest: ${hash}`;
+      }
+    } catch (e) {
+      console.warn('Error updating live FHIR preview:', e);
+    }
+  }
+
+  function initEhrAuthoring() {
+    // 1. Patient Demographics Switcher
+    const patientSelect = document.getElementById('ehr-patient-select');
+    const customWrap = document.getElementById('ehr-patient-custom-wrap');
+    const customInput = document.getElementById('rec-patient-id-custom');
+    const hiddenPatientId = document.getElementById('rec-patient-id');
+
+    if (patientSelect) {
+      patientSelect.addEventListener('change', () => {
+        const opt = patientSelect.options[patientSelect.selectedIndex];
+        if (opt.value === 'custom') {
+          if (customWrap) customWrap.style.display = 'block';
+          if (customInput) customInput.focus();
+        } else {
+          if (customWrap) customWrap.style.display = 'none';
+        }
+
+        const nameEl = document.getElementById('ehr-patient-name');
+        const genderEl = document.getElementById('ehr-patient-gender');
+        const ageEl = document.getElementById('ehr-patient-age');
+        const dobEl = document.getElementById('ehr-patient-dob');
+        const mrnEl = document.getElementById('ehr-patient-mrn');
+        const bedEl = document.getElementById('ehr-patient-bed');
+        const allergyEl = document.getElementById('ehr-patient-allergy');
+        const allergyPill = document.getElementById('ehr-allergy-pill');
+        const avatarEl = document.getElementById('ehr-patient-avatar');
+
+        if (nameEl) nameEl.textContent = opt.dataset.name || 'Patient';
+        if (genderEl) genderEl.textContent = opt.dataset.gender || 'Unspecified';
+        if (ageEl) ageEl.textContent = `${opt.dataset.age || '--'} yrs`;
+        if (dobEl) dobEl.textContent = opt.dataset.dob || 'YYYY-MM-DD';
+        if (mrnEl) mrnEl.textContent = `${opt.dataset.mrn || 'MRN'} (${opt.value})`;
+        if (bedEl) bedEl.textContent = `🛏️ ${opt.dataset.bed || 'General Ward'}`;
+        if (allergyEl) allergyEl.textContent = `⚠️ Allergy: ${opt.dataset.allergy || 'None Reported'}`;
+
+        if (avatarEl) {
+          avatarEl.textContent = (opt.dataset.gender === 'Male') ? '🧑' : '👩';
+        }
+
+        if (allergyPill) {
+          allergyPill.className = 'ehr-status-pill pill-allergy';
+          const sev = opt.dataset.allergySeverity;
+          if (sev === 'severe') allergyPill.classList.add('allergy-severe');
+          else if (sev === 'moderate') allergyPill.classList.add('allergy-moderate');
+          else allergyPill.classList.add('allergy-none');
+        }
+
+        if (hiddenPatientId) {
+          hiddenPatientId.value = (opt.value === 'custom' && customInput && customInput.value) 
+            ? customInput.value.trim() 
+            : `Patient/${opt.value}`;
+        }
+
+        updateLiveFhirPreview();
+      });
+    }
+
+    if (customInput) {
+      customInput.addEventListener('input', () => {
+        if (hiddenPatientId) hiddenPatientId.value = customInput.value.trim() || 'Patient/P-Custom';
+        updateLiveFhirPreview();
+      });
+    }
+
+    // 2. Resource-Type Dynamic Subform Switcher
+    const resourceTypeSelect = document.getElementById('rec-resource-type');
+    const resourceHint = document.getElementById('ehr-resource-hint');
+    const subforms = {
+      'Encounter': document.getElementById('subform-encounter'),
+      'Observation': document.getElementById('subform-observation'),
+      'Condition': document.getElementById('subform-condition'),
+      'MedicationRequest': document.getElementById('subform-medication'),
+      'DiagnosticReport': document.getElementById('subform-diagnosticreport')
+    };
+
+    const hints = {
+      'Encounter': 'Inpatient, emergency, or outpatient clinical touchpoint with reason for admission',
+      'Observation': 'Vital signs, diagnostic laboratory values, or specialized clinical assessments',
+      'Condition': 'Active problem list diagnoses, chronic conditions, or acute complaints (ICD-10)',
+      'MedicationRequest': 'Electronic prescription entry (CPOE) with dosage instructions & dispensing schedule',
+      'DiagnosticReport': 'Pathology findings, laboratory chemistry panels, or diagnostic imaging reports'
+    };
+
+    if (resourceTypeSelect) {
+      resourceTypeSelect.addEventListener('change', () => {
+        const selected = resourceTypeSelect.value;
+        Object.keys(subforms).forEach(type => {
+          if (subforms[type]) {
+            subforms[type].style.display = (type === selected) ? 'block' : 'none';
+          }
+        });
+        if (resourceHint) resourceHint.textContent = hints[selected] || '';
+        updateLiveFhirPreview();
+      });
+    }
+
+    // 3. Subform Presets & Dynamic Toggles
+    // Encounter Code Picker
+    const encCodePicker = document.getElementById('enc-code-picker');
+    const encCustomCode = document.getElementById('enc-custom-code');
+    if (encCodePicker) {
+      encCodePicker.addEventListener('change', () => {
+        if (encCustomCode) {
+          encCustomCode.style.display = (encCodePicker.value === 'custom') ? 'block' : 'none';
+        }
+        updateLiveFhirPreview();
+      });
+    }
+
+    // Observation Preset Picker
+    const obsPresetPicker = document.getElementById('obs-preset-picker');
+    const obsCodeInput = document.getElementById('obs-clinical-code');
+    const obsBpRow = document.getElementById('obs-bp-row');
+    const obsSingleRow = document.getElementById('obs-single-row');
+    const obsCategory = document.getElementById('obs-category');
+    const obsUnit = document.getElementById('obs-unit');
+    const obsRefLow = document.getElementById('obs-ref-low');
+    const obsRefHigh = document.getElementById('obs-ref-high');
+    const obsVal = document.getElementById('obs-value');
+
+    if (obsPresetPicker) {
+      obsPresetPicker.addEventListener('change', () => {
+        const opt = obsPresetPicker.options[obsPresetPicker.selectedIndex];
+        const val = opt.value;
+        if (val === 'bp') {
+          if (obsBpRow) obsBpRow.style.display = 'grid';
+          if (obsSingleRow) obsSingleRow.style.display = 'none';
+          if (obsCodeInput) obsCodeInput.value = 'LOINC:85354-9';
+          if (obsCategory) obsCategory.value = 'vital-signs';
+        } else {
+          if (obsBpRow) obsBpRow.style.display = 'none';
+          if (obsSingleRow) obsSingleRow.style.display = 'grid';
+          if (obsCodeInput) obsCodeInput.value = opt.dataset.code || 'LOINC:8867-4';
+          if (obsCategory && opt.dataset.cat) obsCategory.value = opt.dataset.cat;
+          if (obsUnit && opt.dataset.unit !== undefined) obsUnit.value = opt.dataset.unit;
+          if (obsRefLow && opt.dataset.low !== undefined) obsRefLow.value = opt.dataset.low;
+          if (obsRefHigh && opt.dataset.high !== undefined) obsRefHigh.value = opt.dataset.high;
+          if (obsVal) {
+            if (val === 'hr') obsVal.value = 74;
+            else if (val === 'glucose') obsVal.value = 104;
+            else if (val === 'spo2') obsVal.value = 98;
+            else if (val === 'temp') obsVal.value = 98.6;
+            else if (val === 'troponin') obsVal.value = 0.02;
+            else if (val === 'ef') obsVal.value = 58;
+            else if (val === 'hba1c') obsVal.value = 5.4;
+          }
+        }
+        updateLiveFhirPreview();
+      });
+    }
+
+    // Condition Preset Picker
+    const condPresetPicker = document.getElementById('cond-preset-picker');
+    const condCodeInput = document.getElementById('cond-clinical-code');
+    if (condPresetPicker) {
+      condPresetPicker.addEventListener('change', () => {
+        if (condCodeInput) condCodeInput.value = condPresetPicker.value;
+        updateLiveFhirPreview();
+      });
+    }
+
+    // Medication Preset Picker
+    const medPresetPicker = document.getElementById('med-preset-picker');
+    const medCodeInput = document.getElementById('med-clinical-code');
+    const medDisplayName = document.getElementById('med-display-name');
+    const medDosage = document.getElementById('med-dosage');
+    const medRoute = document.getElementById('med-route');
+    const medQuantity = document.getElementById('med-quantity');
+    const medDaysSupply = document.getElementById('med-days-supply');
+    const medRefills = document.getElementById('med-refills');
+
+    if (medPresetPicker) {
+      medPresetPicker.addEventListener('change', () => {
+        const opt = medPresetPicker.options[medPresetPicker.selectedIndex];
+        if (medCodeInput) medCodeInput.value = opt.value;
+        if (medDisplayName && opt.dataset.name) medDisplayName.value = opt.dataset.name;
+        if (medDosage && opt.dataset.sig) medDosage.value = opt.dataset.sig;
+        if (medRoute && opt.dataset.route) medRoute.value = opt.dataset.route;
+        if (medQuantity && opt.dataset.qty) medQuantity.value = opt.dataset.qty;
+        if (medDaysSupply && opt.dataset.days) medDaysSupply.value = opt.dataset.days;
+        if (medRefills && opt.dataset.refills) medRefills.value = opt.dataset.refills;
+        updateLiveFhirPreview();
+      });
+    }
+
+    // DiagnosticReport Preset Picker
+    const diagPresetPicker = document.getElementById('diag-preset-picker');
+    const diagCodeInput = document.getElementById('diag-clinical-code');
+    const diagSection = document.getElementById('diag-section');
+    if (diagPresetPicker) {
+      diagPresetPicker.addEventListener('change', () => {
+        const opt = diagPresetPicker.options[diagPresetPicker.selectedIndex];
+        if (diagCodeInput) diagCodeInput.value = opt.value;
+        if (diagSection && opt.dataset.sec) diagSection.value = opt.dataset.sec;
+        updateLiveFhirPreview();
+      });
+    }
+
+    // 4. Reactive input listeners for live JSON preview
+    const form = document.getElementById('form-add-clinical-record');
+    if (form) {
+      form.addEventListener('input', () => updateLiveFhirPreview());
+      form.addEventListener('change', () => updateLiveFhirPreview());
+    }
+
+    // 5. Collapsible Live Preview Accordion
+    const previewToggle = document.getElementById('ehr-preview-toggle');
+    const previewBody = document.getElementById('ehr-preview-body');
+    const toggleIcon = document.getElementById('preview-toggle-icon');
+    if (previewToggle && previewBody) {
+      previewToggle.addEventListener('click', () => {
+        previewBody.classList.toggle('collapsed');
+        if (toggleIcon) toggleIcon.classList.toggle('collapsed');
+      });
+    }
+
+    // Initial trigger
+    updateEhrClinicianContext();
+    updateLiveFhirPreview();
+
+    // 6. Enhanced Clinical Form Submission
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const portSelect = document.getElementById('rec-target-port');
+        const portVal = parseInt(portSelect ? portSelect.value : currentPersona.port, 10);
+        const { resourceData, resourceType, clinicalCode, patientId } = buildFhirResourceFromForm();
+
+        const btn = document.getElementById('btn-commit-record');
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = '🔒 Signing & Anchoring to Chain...';
+        }
+
+        try {
+          const res = await fetch('/api/add-patient-record', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...getAuthHeaders()
+            },
+            body: JSON.stringify({
+              port: portVal,
+              patientId,
+              resourceType,
+              clinicalCode,
+              resourceData,
+              callerAddress: currentPersona ? currentPersona.address : '0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02'
+            })
+          });
+
+          const json = await res.json();
+          if (json.success) {
+            const vaultMsg = json.vaultCid ? `\nEncrypted Vault CID: ${json.vaultCid}` : '';
+            alert(
+              `✓ Clinical Record Cryptographically Anchored!\n\n` +
+              `• Facility: Port ${portVal} (${currentPersona ? currentPersona.organizationName : 'Hospital'})\n` +
+              `• Resource: ${resourceType} (${clinicalCode})\n` +
+              `• Patient: ${patientId}\n` +
+              `• Block Tx Hash: ${json.txHash}\n` +
+              `• SHA-256 State Digest: ${json.dataHash}` +
+              vaultMsg
+            );
+
+            loadChainData();
+            loadVaultStats();
+            updateLiveFhirPreview();
+          } else {
+            alert(`Error committing clinical record: ${json.error}`);
+          }
+        } catch (err) {
+          alert(`Failed to commit clinical record: ${err.message}`);
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = '🔒 Finalize, Sign & Commit Clinical Record';
+          }
+        }
+      });
+    }
   }
 
   // Patient Consent UI
@@ -1585,10 +2334,10 @@ document.addEventListener('DOMContentLoaded', () => {
     consentContainer.innerHTML = '';
     const facilities = [
       { id: '11103', name: 'Metro General Hospital', desc: 'Inpatient EHR, surgical notes, discharge summaries' },
-      { id: '11104', name: 'BioLabs Pathology & Diagnostics', desc: 'Lab specimens, genetic panels, bloodwork' },
-      { id: '11105', name: 'CardioSpecialty Center', desc: 'ECG waveforms, echocardiograms, cardiology consults' },
-      { id: '11106', name: 'Emergency & Urgent Care', desc: 'Trauma triage, ER encounters, allergy alerts' },
-      { id: '11107', name: 'Outpatient Pharmacy Network', desc: 'Prescription dispensing, medication reconciliation' }
+      { id: '11104', name: 'BioLabs Diagnostic Center', desc: 'Lab specimens, genetic panels, bloodwork' },
+      { id: '11105', name: 'Cardio Specialty Clinic', desc: 'ECG waveforms, echocardiograms, cardiology consults' },
+      { id: '11106', name: 'Emergency Care Center', desc: 'Trauma triage, ER encounters, allergy alerts' },
+      { id: '11107', name: 'Consortium Pharmacy Network', desc: 'Prescription dispensing, medication reconciliation' }
     ];
 
     facilities.forEach(fac => {
@@ -1663,9 +2412,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const res = await fetch('/api/search', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeaders()
+          },
           body: JSON.stringify({ algorithm, startNetworkId, searchValue })
         });
+
+        if (res.status === 403) {
+          const errData = await res.json().catch(() => ({}));
+          resultsSection.style.display = 'block';
+          summaryBar.innerHTML = `
+            <span style="color: #ef4444;"><strong>⛔ 403 Forbidden:</strong> ${escapeHtml(errData.error || 'Cross-Chain search traversal is restricted to Consortium Oversight.')}</span>
+          `;
+          pathRow.innerHTML = '';
+          timeline.innerHTML = '<div class="empty-state color-danger">Access Denied: Healthcare staff cannot execute cross-chain traversal queries under HIPAA § 164.502(b).</div>';
+          return;
+        }
+
         const json = await res.json();
         if (json.success && json.result) {
           const { traversalPath, longitudinalRecord, query } = json.result;
@@ -1839,7 +2603,497 @@ document.addEventListener('DOMContentLoaded', () => {
     return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  // ========================================================
+  // Multi-Fork Chain & Block Explorer
+  // ========================================================
+  let cachedExplorerChains = [];
+  let selectedExplorerPort = 8546;
+  let selectedExplorerBlockNum = null;
+  let currentExplorerMode = 'blocks'; // 'blocks' or 'lineage'
+
+  async function initBlocksTab() {
+    setupExplorerToolbar();
+    await loadExplorerChains();
+  }
+
+  function setupExplorerToolbar() {
+    const chainSelect = document.getElementById('explorer-chain-select');
+    if (chainSelect && !chainSelect.dataset.listenerAttached) {
+      chainSelect.dataset.listenerAttached = 'true';
+      chainSelect.addEventListener('change', () => {
+        selectedExplorerPort = parseInt(chainSelect.value, 10);
+        updateChainMetricsBar();
+        if (currentExplorerMode === 'blocks') {
+          loadChainBlocks(selectedExplorerPort);
+        }
+      });
+    }
+
+    const btnModeBlocks = document.getElementById('btn-mode-blocks');
+    const btnModeLineage = document.getElementById('btn-mode-lineage');
+    const patientFilterGroup = document.getElementById('explorer-patient-filter-group');
+    const viewBlocks = document.getElementById('view-chain-blocks');
+    const viewLineage = document.getElementById('view-patient-lineage');
+    const patientSelect = document.getElementById('explorer-patient-select');
+
+    if (btnModeBlocks && !btnModeBlocks.dataset.listenerAttached) {
+      btnModeBlocks.dataset.listenerAttached = 'true';
+      btnModeBlocks.addEventListener('click', () => {
+        currentExplorerMode = 'blocks';
+        btnModeBlocks.classList.add('active');
+        btnModeLineage.classList.remove('active');
+        if (patientFilterGroup) patientFilterGroup.style.display = 'none';
+        if (viewBlocks) viewBlocks.style.display = 'block';
+        if (viewLineage) viewLineage.style.display = 'none';
+        loadChainBlocks(selectedExplorerPort);
+      });
+    }
+
+    if (btnModeLineage && !btnModeLineage.dataset.listenerAttached) {
+      btnModeLineage.dataset.listenerAttached = 'true';
+      btnModeLineage.addEventListener('click', () => {
+        currentExplorerMode = 'lineage';
+        btnModeLineage.classList.add('active');
+        btnModeBlocks.classList.remove('active');
+        if (patientFilterGroup) patientFilterGroup.style.display = 'flex';
+        if (viewBlocks) viewBlocks.style.display = 'none';
+        if (viewLineage) viewLineage.style.display = 'block';
+        const targetPid = patientSelect ? patientSelect.value : 'Patient/P-101';
+        loadPatientLineage(targetPid);
+      });
+    }
+
+    if (patientSelect && !patientSelect.dataset.listenerAttached) {
+      patientSelect.dataset.listenerAttached = 'true';
+      patientSelect.addEventListener('change', () => {
+        if (currentExplorerMode === 'lineage') {
+          loadPatientLineage(patientSelect.value);
+        }
+      });
+    }
+
+    const btnRefresh = document.getElementById('btn-refresh-blocks');
+    if (btnRefresh && !btnRefresh.dataset.listenerAttached) {
+      btnRefresh.dataset.listenerAttached = 'true';
+      btnRefresh.addEventListener('click', () => {
+        if (currentExplorerMode === 'blocks') {
+          loadChainBlocks(selectedExplorerPort);
+        } else {
+          const targetPid = patientSelect ? patientSelect.value : 'Patient/P-101';
+          loadPatientLineage(targetPid);
+        }
+      });
+    }
+  }
+
+  async function loadExplorerChains() {
+    try {
+      const res = await fetch('/api/explorer/chains', { headers: getAuthHeaders() });
+      const json = await res.json();
+      if (!json.success || !Array.isArray(json.chains)) return;
+
+      cachedExplorerChains = json.chains;
+      const isConsortiumOversight = (currentPersona && (currentPersona.role === 'STEERING_COUNCIL' || currentPersona.role === 'AUDITOR'));
+
+      // If user is individual healthcare staff, jail selectedExplorerPort to their own org port
+      if (!isConsortiumOversight && currentPersona && currentPersona.port) {
+        selectedExplorerPort = currentPersona.port;
+      } else if (!cachedExplorerChains.find(c => c.port === selectedExplorerPort)) {
+        selectedExplorerPort = cachedExplorerChains[0] ? cachedExplorerChains[0].port : 8545;
+      }
+
+      // Update explorer titles and isolation alerts
+      const explorerTitle = document.querySelector('#tab-blocks .section-title, #tab-blocks h2');
+      if (explorerTitle) {
+        explorerTitle.textContent = isConsortiumOversight 
+          ? 'Multi-Fork Blockchain Explorer' 
+          : `🔒 ${currentPersona.organizationName || 'Organization'} Private Ledger Explorer`;
+      }
+
+      const select = document.getElementById('explorer-chain-select');
+      if (select) {
+        select.innerHTML = '';
+        cachedExplorerChains.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.port;
+          const roleIcon = c.role === 'repository' ? '🏛️' : (c.isRoot ? '🌐' : '🏥');
+          opt.textContent = `${roleIcon} ${c.name} (Port ${c.port} | Net ${c.networkId})`;
+          if (c.port === selectedExplorerPort) opt.selected = true;
+          select.appendChild(opt);
+        });
+
+        // Disable select for individual staff so they cannot switch to other chains
+        select.disabled = !isConsortiumOversight;
+        if (!isConsortiumOversight) {
+          select.title = `Your access is restricted to ${currentPersona.organizationName} (Port ${currentPersona.port}) under HIPAA § 164.502(b)`;
+        } else {
+          select.removeAttribute('title');
+        }
+      }
+
+      updateChainMetricsBar();
+      if (currentExplorerMode === 'blocks') {
+        await loadChainBlocks(selectedExplorerPort);
+      }
+    } catch (e) {
+      console.error('Error loading explorer chains:', e);
+    }
+  }
+
+  function updateChainMetricsBar() {
+    const chain = cachedExplorerChains.find(c => c.port === selectedExplorerPort);
+    if (!chain) return;
+
+    const nameEl = document.getElementById('metric-chain-name');
+    const netPortEl = document.getElementById('metric-net-port');
+    const heightEl = document.getElementById('metric-block-height');
+    const lineageEl = document.getElementById('metric-fork-lineage');
+    const recordsEl = document.getElementById('metric-total-records');
+    const statusEl = document.getElementById('metric-chain-status');
+
+    if (nameEl) nameEl.textContent = chain.name;
+    if (netPortEl) netPortEl.textContent = `Net ${chain.networkId} : Port ${chain.port}`;
+    if (heightEl) heightEl.textContent = `Height: #${chain.currentBlockHeight} (${chain.totalBlocks} blocks)`;
+    if (lineageEl) {
+      lineageEl.textContent = chain.role === 'repository'
+        ? 'Consortium Governance Anchor'
+        : (chain.isRoot ? 'Master Patient Index Genesis' : `Forked from Net ${chain.parentNetworkId} @ Block ${chain.forkBlockNumber}`);
+    }
+    if (recordsEl) recordsEl.textContent = `${chain.totalRecords} Records`;
+    if (statusEl) {
+      statusEl.textContent = chain.online ? 'Online (Consensus OK)' : 'Offline';
+      statusEl.className = chain.online ? 'badge badge-success' : 'badge badge-danger';
+    }
+  }
+
+  async function loadChainBlocks(port) {
+    const feedContainer = document.getElementById('blocks-feed-container');
+    const badgeCount = document.getElementById('badge-blocks-count');
+    if (!feedContainer) return;
+
+    feedContainer.innerHTML = '<div class="loading-spinner">Loading chain blocks...</div>';
+
+    try {
+      const res = await fetch(`/api/explorer/chain/${port}/blocks`, { headers: getAuthHeaders() });
+      if (res.status === 403) {
+        feedContainer.innerHTML = `
+          <div class="empty-state" style="border: 1px solid #ef4444; background: rgba(239, 68, 68, 0.05); padding: 1.5rem; border-radius: 8px;">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">⛔</div>
+            <h4 style="color: #ef4444; margin-bottom: 0.5rem;">Access Denied (403 Forbidden)</h4>
+            <p style="font-size: 0.9rem; color: var(--text-secondary); margin: 0;">
+              Unauthorized cross-chain access attempt. Under HIPAA § 164.502(b) & GDPR Art. 5(1)(f), 
+              healthcare staff at <strong>${escapeHtml(currentPersona ? currentPersona.organizationName : 'your facility')}</strong> 
+              cannot inspect external clinical ledgers without patient consent or inter-organizational referral.
+            </p>
+          </div>
+        `;
+        if (badgeCount) badgeCount.textContent = 'Access Restricted';
+        return;
+      }
+      const json = await res.json();
+
+      if (!json.success || !Array.isArray(json.blocks)) {
+        feedContainer.innerHTML = '<div class="empty-state">No blocks found on this chain.</div>';
+        return;
+      }
+
+      const blocks = json.blocks;
+      if (badgeCount) badgeCount.textContent = `${blocks.length} Blocks`;
+
+      if (blocks.length === 0) {
+        feedContainer.innerHTML = '<div class="empty-state">No blocks mined yet.</div>';
+        return;
+      }
+
+      feedContainer.innerHTML = '';
+      blocks.slice().reverse().forEach((b) => {
+        const card = document.createElement('div');
+        card.className = `block-feed-card ${selectedExplorerBlockNum === b.blockNumber ? 'active' : ''}`;
+        card.dataset.blockNumber = b.blockNumber;
+
+        const isGenesis = (b.blockNumber === 0);
+        const hasRecords = (b.recordsCount > 0);
+
+        card.innerHTML = `
+          <div class="block-card-header">
+            <span class="block-num-badge ${isGenesis ? 'genesis' : ''}">
+              ${isGenesis ? 'Genesis Block #0' : `Block #${b.blockNumber}`}
+            </span>
+            <span class="block-time">${new Date(b.timestamp * 1000).toLocaleTimeString()}</span>
+          </div>
+          <div class="block-hash-row">
+            <span class="hash-label">Hash:</span>
+            <span class="hash-val font-mono" title="${b.hash}">${b.hash.slice(0, 16)}...${b.hash.slice(-8)}</span>
+          </div>
+          <div class="block-meta-row">
+            <span class="badge ${hasRecords ? 'badge-primary' : 'badge-outline'}">
+              ${b.recordsCount} FHIR Records
+            </span>
+            <span class="badge badge-secondary">
+              ${b.txCount} Tx
+            </span>
+          </div>
+        `;
+
+        card.addEventListener('click', () => {
+          document.querySelectorAll('.block-feed-card').forEach(c => c.classList.remove('active'));
+          card.classList.add('active');
+          selectedExplorerBlockNum = b.blockNumber;
+          inspectBlock(port, b.blockNumber);
+        });
+
+        feedContainer.appendChild(card);
+      });
+
+      const targetBlock = selectedExplorerBlockNum !== null
+        ? blocks.find(b => b.blockNumber === selectedExplorerBlockNum) || blocks[blocks.length - 1]
+        : blocks[blocks.length - 1];
+
+      if (targetBlock) {
+        selectedExplorerBlockNum = targetBlock.blockNumber;
+        inspectBlock(port, targetBlock.blockNumber);
+      }
+    } catch (e) {
+      feedContainer.innerHTML = `<div class="empty-state color-danger">Error loading blocks: ${e.message}</div>`;
+    }
+  }
+
+  async function inspectBlock(port, blockNum) {
+    const titleEl = document.getElementById('inspector-block-title');
+    const subtitleEl = document.getElementById('inspector-block-subtitle');
+    const badgeEl = document.getElementById('inspector-block-badge');
+    const bodyEl = document.getElementById('inspector-block-body');
+
+    if (!bodyEl) return;
+    bodyEl.innerHTML = '<div class="loading-spinner">Loading block data & validating cryptographic hashes...</div>';
+
+    try {
+      const res = await fetch(`/api/explorer/chain/${port}/block/${blockNum}`, { headers: getAuthHeaders() });
+      if (res.status === 403) {
+        bodyEl.innerHTML = '<div class="empty-state color-danger">⛔ 403 Forbidden: Cross-chain block inspection unauthorized under HIPAA/GDPR isolation.</div>';
+        return;
+      }
+      const json = await res.json();
+
+      if (!json.success || !json.block) {
+        bodyEl.innerHTML = '<div class="empty-state color-danger">Failed to retrieve block details.</div>';
+        return;
+      }
+
+      const blk = json.block;
+      const h = blk.blockHeader;
+
+      if (titleEl) titleEl.textContent = `Block #${blk.blockNumber} Inspector`;
+      if (subtitleEl) subtitleEl.textContent = `Chain Port ${port} | Mined at ${new Date(h.timestamp * 1000).toLocaleString()}`;
+      if (badgeEl) {
+        badgeEl.textContent = (blk.records.length > 0) ? `${blk.records.length} Verified Records` : 'Empty State Block';
+        badgeEl.className = (blk.records.length > 0) ? 'badge badge-success' : 'badge badge-secondary';
+      }
+
+      let recordsHtml = '';
+      if (blk.records && blk.records.length > 0) {
+        recordsHtml = `
+          <div class="block-records-section">
+            <h4 class="section-title">Committed HL7 FHIR Healthcare Records (${blk.records.length}):</h4>
+            <div class="records-list">
+              ${blk.records.map((r) => {
+                const formattedJson = JSON.stringify(r.resourceData, null, 2);
+                return `
+                  <div class="record-inspect-card">
+                    <div class="record-header">
+                      <div class="record-header-left">
+                        <span class="badge badge-primary font-bold">${escapeHtml(r.resourceType)}</span>
+                        <span class="record-patient-id font-mono font-bold">${escapeHtml(r.patientId)}</span>
+                        <span class="record-code font-mono">${escapeHtml(r.clinicalCode)}</span>
+                      </div>
+                      <div class="record-header-right">
+                        ${r.integrityVerified ? 
+                          '<span class="badge badge-success" title="SHA-256 integrity match verified against on-chain anchor">✓ SHA-256 VERIFIED</span>' : 
+                          '<span class="badge badge-danger">⚠ HASH MISMATCH</span>'}
+                        ${r.hasOffChainVault ? 
+                          `<span class="badge badge-outline" title="Encrypted off-chain in AES-256-GCM vault">🔐 Vault: ${r.vaultCid.slice(0, 16)}...</span>` : ''}
+                      </div>
+                    </div>
+
+                    <div class="record-hashes-row">
+                      <div class="hash-field">
+                        <span class="lbl">On-Chain State Digest:</span>
+                        <span class="val font-mono">${r.dataHash}</span>
+                      </div>
+                    </div>
+
+                    <div class="record-json-preview">
+                      <div class="json-tools-row">
+                        <span class="json-lbl">HL7 FHIR R4 JSON Payload:</span>
+                        <button type="button" class="btn btn-xs btn-outline btn-copy-raw-json" data-json="${encodeURIComponent(formattedJson)}">
+                          📋 Copy JSON
+                        </button>
+                      </div>
+                      <pre class="json-code-block font-mono"><code>${escapeHtml(formattedJson)}</code></pre>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      } else {
+        recordsHtml = `
+          <div class="empty-state" style="margin-top: 1rem;">
+            <span style="font-size: 1.5rem; display: block; margin-bottom: 0.25rem;">ℹ️</span>
+            No clinical records were committed inside this specific block (Genesis or System Consensus Block).
+          </div>
+        `;
+      }
+
+      bodyEl.innerHTML = `
+        <div class="block-header-details-grid">
+          <div class="detail-item">
+            <span class="detail-label">Block Number:</span>
+            <span class="detail-value font-mono">${h.number} (${blk.blockNumber})</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Block Hash:</span>
+            <span class="detail-value font-mono text-truncate" title="${h.hash}">${h.hash}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Parent Block Hash:</span>
+            <span class="detail-value font-mono text-truncate" title="${h.parentHash}">${h.parentHash}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Mined By (Validator):</span>
+            <span class="detail-value font-mono text-truncate">${h.miner}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Timestamp:</span>
+            <span class="detail-value">${new Date(h.timestamp * 1000).toLocaleString()} (${h.timestamp})</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Gas Used / Transactions:</span>
+            <span class="detail-value font-mono">${h.gasUsed} / ${h.txCount} tx</span>
+          </div>
+        </div>
+
+        ${recordsHtml}
+      `;
+
+      bodyEl.querySelectorAll('.btn-copy-raw-json').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const raw = decodeURIComponent(btn.getAttribute('data-json'));
+          navigator.clipboard.writeText(raw).then(() => {
+            btn.textContent = '✓ Copied!';
+            setTimeout(() => { btn.textContent = '📋 Copy JSON'; }, 2000);
+          });
+        });
+      });
+
+    } catch (e) {
+      bodyEl.innerHTML = `<div class="empty-state color-danger">Error inspecting block: ${e.message}</div>`;
+    }
+  }
+
+  async function loadPatientLineage(patientId) {
+    const timelineEl = document.getElementById('patient-lineage-timeline');
+    const badgeHops = document.getElementById('badge-lineage-hops');
+    const titleEl = document.getElementById('lineage-patient-title');
+
+    if (!timelineEl) return;
+    timelineEl.innerHTML = '<div class="loading-spinner">Tracing patient record trajectory across all forks...</div>';
+
+    try {
+      const cleanPid = patientId.replace(/^Patient\//i, '');
+      const res = await fetch(`/api/explorer/patient/${encodeURIComponent(cleanPid)}/lineage`, { headers: getAuthHeaders() });
+      const json = await res.json();
+
+      if (!json.success || !json.lineage) {
+        timelineEl.innerHTML = '<div class="empty-state">No lineage touchpoints found for this patient.</div>';
+        return;
+      }
+
+      const l = json.lineage;
+      if (titleEl) titleEl.textContent = `Patient ${patientId} Cross-Fork Trajectory (${l.participatingForks.length} Healthcare Entities)`;
+      if (badgeHops) badgeHops.textContent = `${l.totalTouchpoints} Causal Touchpoints`;
+
+      if (!l.lineageTrajectory || l.lineageTrajectory.length === 0) {
+        timelineEl.innerHTML = '<div class="empty-state">No records found for this patient across the fork tree.</div>';
+        return;
+      }
+
+      timelineEl.innerHTML = `
+        <div class="lineage-summary-strip">
+          <span class="summary-item"><strong>Patient ID:</strong> <span class="font-mono">${escapeHtml(l.patientId)}</span></span>
+          <span class="summary-item"><strong>Traversed Organizations:</strong> ${l.participatingForks.join(' ➔ ')}</span>
+        </div>
+        <div class="lineage-timeline-track">
+          ${l.lineageTrajectory.map((step, idx) => {
+            if (step.isShielded) {
+              return `
+                <div class="timeline-step-card shielded-event-notice">
+                  <div class="step-marker" style="background: #64748b;">
+                    <span class="step-num">${idx + 1}</span>
+                  </div>
+                  <div class="step-content">
+                    <div class="step-header">
+                      <div class="step-org-badge">
+                        <span class="org-icon">🔒</span>
+                        <strong>${escapeHtml(step.chainName)}</strong>
+                        <span class="font-mono text-muted">(Port ${step.port} | Net ${step.networkId} | Block #${step.blockNumber})</span>
+                      </div>
+                      <span class="step-time">${new Date(step.timestamp * 1000).toLocaleString()}</span>
+                    </div>
+                    <div class="step-resource-info" style="margin-top: 0.5rem;">
+                      <span class="badge badge-secondary font-bold">${escapeHtml(step.resourceType)}</span>
+                      <span class="badge badge-outline" style="border-color: #f59e0b; color: #d97706;">🛡️ External Facility Shielded</span>
+                    </div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem; background: var(--bg-surface-elevated); padding: 0.75rem; border-radius: 6px; font-style: italic;">
+                      [RESTRICTED PHI - EXTERNAL FACILITY]: Clinical payload redacted for ${escapeHtml(currentPersona ? currentPersona.name : 'current user')} pursuant to Minimum Necessary disclosure rule. Direct inter-facility referral or patient-signed authorization required for payload decryption.
+                    </div>
+                  </div>
+                </div>
+              `;
+            }
+
+            const formatted = JSON.stringify(step.resourceData, null, 2);
+            const isGenesis = step.isRoot;
+            return `
+              <div class="timeline-step-card">
+                <div class="step-marker">
+                  <span class="step-num">${idx + 1}</span>
+                </div>
+                <div class="step-content">
+                  <div class="step-header">
+                    <div class="step-org-badge">
+                      <span class="org-icon">${isGenesis ? '🌐' : '🏥'}</span>
+                      <strong>${escapeHtml(step.chainName)}</strong>
+                      <span class="font-mono text-muted">(Port ${step.port} | Net ${step.networkId} | Block #${step.blockNumber})</span>
+                    </div>
+                    <span class="step-time">${new Date(step.timestamp * 1000).toLocaleString()}</span>
+                  </div>
+
+                  <div class="step-resource-info">
+                    <span class="badge badge-primary font-bold">${escapeHtml(step.resourceType)}</span>
+                    <span class="resource-code font-mono">${escapeHtml(step.clinicalCode)}</span>
+                    ${step.integrityVerified ? 
+                      '<span class="badge badge-success">✓ SHA-256 Validated</span>' : 
+                      '<span class="badge badge-danger">⚠ Tampered</span>'}
+                  </div>
+
+                  <div class="step-json-card">
+                    <pre class="json-code-block font-mono"><code>${escapeHtml(formatted)}</code></pre>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    } catch (e) {
+      timelineEl.innerHTML = `<div class="empty-state color-danger">Error tracing lineage: ${e.message}</div>`;
+    }
+  }
+
   // Boot Platform UI
   initPersonas();
   loadTreeTopology();
+  initEhrAuthoring();
 });

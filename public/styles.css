@@ -1772,3 +1772,883 @@ code {
 .input-with-action input {
   flex: 1;
 }
+
+/* ========================================================
+   Multi-Fork Block Explorer & Patient Lineage Styles
+   ======================================================== */
+.security-compliance-banner {
+  background: rgba(88, 166, 255, 0.08);
+  border: 1px solid rgba(88, 166, 255, 0.3);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  margin-bottom: 18px;
+}
+
+.security-banner-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.security-icon {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.security-compliance-banner h4 {
+  margin: 0 0 6px 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #58a6ff;
+}
+
+.security-desc {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.explorer-controls-card {
+  margin-bottom: 16px;
+}
+
+.explorer-nav-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.toolbar-label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.explorer-select {
+  min-width: 280px;
+  font-weight: 600;
+}
+
+.toggle-pill-group {
+  display: inline-flex;
+  background: #0d1117;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.toggle-pill {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toggle-pill.active {
+  background: var(--primary);
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.chain-metrics-summary-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.metric-box {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metric-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+}
+
+.metric-value {
+  font-size: 13.5px;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.blocks-feed-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 640px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.block-feed-card {
+  background: #0d1117;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.block-feed-card:hover {
+  border-color: rgba(56, 139, 253, 0.4);
+  background: #161b22;
+}
+
+.block-feed-card.active {
+  border-color: #58a6ff;
+  background: rgba(56, 139, 253, 0.08);
+  box-shadow: 0 0 0 1px #58a6ff;
+}
+
+.block-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.block-num-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #58a6ff;
+  font-family: var(--font-mono);
+}
+
+.block-num-badge.genesis {
+  color: #e3b341;
+}
+
+.block-time {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.block-hash-row {
+  font-size: 11.5px;
+  margin-bottom: 8px;
+}
+
+.hash-label {
+  color: var(--text-secondary);
+  margin-right: 4px;
+}
+
+.block-meta-row {
+  display: flex;
+  gap: 6px;
+}
+
+.block-header-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  background: #0d1117;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.detail-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-value {
+  font-size: 12.5px;
+  color: var(--text-primary);
+}
+
+.record-inspect-card {
+  background: #0d1117;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.record-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.record-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.record-patient-id {
+  font-size: 13px;
+  color: #f0f6fc;
+}
+
+.record-code {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.record-hashes-row {
+  background: #161b22;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 11.5px;
+  margin-bottom: 10px;
+}
+
+.hash-field .lbl {
+  color: var(--text-secondary);
+  margin-right: 6px;
+}
+
+.hash-field .val {
+  color: #3fb950;
+  word-break: break-all;
+}
+
+.json-tools-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.json-lbl {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+
+.json-code-block {
+  background: #090d13;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-size: 11.5px;
+  color: #c9d1d9;
+  max-height: 220px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Patient Lineage Timeline */
+.lineage-summary-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  background: #0d1117;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  font-size: 13px;
+}
+
+.lineage-timeline-track {
+  position: relative;
+  padding-left: 36px;
+}
+
+.lineage-timeline-track::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 10px;
+  bottom: 20px;
+  width: 2px;
+  background: var(--border-color);
+}
+
+.timeline-step-card {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.step-marker {
+  position: absolute;
+  left: -36px;
+  top: 4px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #161b22;
+  border: 2px solid var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 12px;
+  color: #58a6ff;
+  z-index: 2;
+}
+
+.step-content {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 14px 16px;
+}
+
+.step-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.step-org-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: #f0f6fc;
+}
+
+.step-time {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.step-resource-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.shielded-event-notice {
+  background: rgba(240, 136, 62, 0.08);
+  border: 1px dashed rgba(240, 136, 62, 0.4);
+  border-radius: 6px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.explorer-select:disabled {
+  background: #161b22 !important;
+  color: #8b949e !important;
+  cursor: not-allowed !important;
+  border-color: #30363d !important;
+  opacity: 0.85;
+}
+
+/* ==========================================================================
+   Clinical Institutional EHR Documentation Styling (Epic / Cerner Look & Feel)
+   ========================================================================== */
+
+.clinical-ehr-card {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.ehr-card-header {
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border-bottom: 1px solid #334155;
+  padding: 18px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.ehr-title-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ehr-title-icon {
+  font-size: 26px;
+  width: 48px;
+  height: 48px;
+  background: rgba(56, 139, 253, 0.15);
+  border: 1px solid rgba(56, 139, 253, 0.3);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ehr-header-badges {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ehr-card-body {
+  padding: 24px;
+}
+
+/* 1. Patient Demographics Sticky Banner */
+.ehr-patient-banner {
+  background: #131d2e;
+  border: 1px solid #1e293b;
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.ehr-patient-primary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1 1 450px;
+}
+
+.ehr-patient-avatar {
+  width: 56px;
+  height: 56px;
+  background: #1e293b;
+  border: 2px solid #3b82f6;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  flex-shrink: 0;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
+}
+
+.ehr-patient-demographics {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.ehr-patient-select-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ehr-label-inline {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  white-space: nowrap;
+  font-weight: 600;
+  margin: 0;
+}
+
+.ehr-patient-select {
+  background: #0f172a;
+  border: 1px solid #3b82f6;
+  color: #f8fafc;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  max-width: 420px;
+  cursor: pointer;
+}
+
+.ehr-patient-select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
+}
+
+.ehr-patient-details-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.ehr-patient-name {
+  color: #f1f5f9;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.ehr-dot-sep {
+  color: #475569;
+}
+
+/* Status Pills Grid */
+.ehr-status-pills {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  flex: 1 1 500px;
+}
+
+.ehr-status-pill {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ehr-status-pill .pill-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.ehr-status-pill .pill-value {
+  font-size: 13px;
+  color: #e2e8f0;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pill-mrn .pill-value {
+  color: #60a5fa;
+}
+
+.pill-location .pill-value {
+  color: #38bdf8;
+}
+
+.pill-facility .pill-value {
+  color: #c084fc;
+}
+
+/* Allergy Pill Variations */
+.allergy-severe {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.allergy-severe .pill-label {
+  color: #f87171;
+}
+
+.allergy-severe .pill-value {
+  color: #fca5a5;
+  font-weight: 700;
+}
+
+.allergy-moderate {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.allergy-moderate .pill-label {
+  color: #fbbf24;
+}
+
+.allergy-moderate .pill-value {
+  color: #fde68a;
+  font-weight: 700;
+}
+
+.allergy-none {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.allergy-none .pill-label {
+  color: #34d399;
+}
+
+.allergy-none .pill-value {
+  color: #6ee7b7;
+}
+
+/* Section Divider */
+.ehr-section-divider {
+  display: flex;
+  align-items: center;
+  margin: 18px 0 14px 0;
+  position: relative;
+}
+
+.ehr-section-divider::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #334155;
+  top: 50%;
+  z-index: 1;
+}
+
+.ehr-section-title {
+  position: relative;
+  z-index: 2;
+  background: #0f172a;
+  padding-right: 14px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+/* Selector Row */
+.ehr-selector-row {
+  margin-bottom: 20px;
+}
+
+.ehr-resource-select {
+  border-color: #3b82f6 !important;
+  background-color: #1e293b !important;
+  color: #60a5fa !important;
+}
+
+.ehr-input-highlight {
+  border-color: #10b981 !important;
+}
+
+/* 2. Subforms Container & Subforms */
+.ehr-subforms-container {
+  margin-bottom: 24px;
+}
+
+.ehr-subform {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid #334155;
+  border-left: 4px solid #3b82f6;
+  border-radius: var(--radius-md);
+  padding: 20px 22px;
+  animation: fadeInSubform 0.25s ease-in-out;
+}
+
+@keyframes fadeInSubform {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ehr-subform-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #1e293b;
+  flex-wrap: wrap;
+}
+
+.subform-badge {
+  background: rgba(59, 130, 246, 0.18);
+  color: #60a5fa;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+}
+
+.subform-desc {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+/* Addon & Range Inputs */
+.input-with-addon {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.input-with-addon .form-control {
+  padding-right: 56px;
+}
+
+.input-addon {
+  position: absolute;
+  right: 12px;
+  font-size: 12px;
+  color: #64748b;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.input-range-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.input-range-group .range-sep {
+  color: #64748b;
+  font-weight: bold;
+}
+
+.form-row-4 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+/* 3. Live Synthesized FHIR R4 JSON Inspection Accordion */
+.ehr-json-preview-container {
+  background: #020617;
+  border: 1px solid #1e293b;
+  border-radius: var(--radius-md);
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+
+.ehr-preview-header {
+  padding: 12px 18px;
+  background: #0b1329;
+  border-bottom: 1px solid #1e293b;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+}
+
+.ehr-preview-header:hover {
+  background: #111e3f;
+}
+
+.ehr-preview-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  color: #f1f5f9;
+}
+
+.ehr-preview-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.preview-hash-lbl {
+  color: #64748b;
+}
+
+.preview-hash {
+  color: #38bdf8;
+  max-width: 240px;
+}
+
+.preview-toggle-indicator {
+  color: #94a3b8;
+  font-size: 12px;
+  transition: transform 0.2s;
+}
+
+.preview-toggle-indicator.collapsed {
+  transform: rotate(-90deg);
+}
+
+.ehr-preview-body {
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 0;
+  transition: max-height 0.25s ease-out;
+}
+
+.ehr-preview-body.collapsed {
+  max-height: 0;
+  display: none;
+}
+
+.ehr-preview-body pre {
+  margin: 0;
+  padding: 14px 18px;
+  border-radius: 0;
+  background: transparent;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* 4. Action Bar */
+.ehr-action-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ehr-action-disclaimer {
+  font-size: 12.5px;
+  color: #94a3b8;
+  background: rgba(30, 41, 59, 0.6);
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ehr-btn-commit {
+  padding: 16px 24px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  box-shadow: 0 4px 14px rgba(56, 139, 253, 0.35);
+  transition: all 0.2s ease-in-out;
+}
+
+.ehr-btn-commit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(56, 139, 253, 0.45);
+}
+
+

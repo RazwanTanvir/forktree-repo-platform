@@ -149,20 +149,21 @@ forktree-platform/
 
 ```
                      [Port 8545 / Network 11101]
-                    StoreForkEvent (Repository)
+                  Consortium Governance Repository
                                  │
                                  ▼
                      [Port 8546 / Network 11102]
-                         Root Blockchain
+                   Master Patient Index (MPI Root)
                         /               \
             (Fork @ Block 1)         (Fork @ Block 3)
                       /                   \
            [Port 8547 / 11103]     [Port 8548 / 11104]
-               Fork Alpha               Fork Beta
+         Metro General Hospital   BioLabs Diagnostic Center
                /        \                   │
      (Fork @ 2)      (Fork @ 1)         (Fork @ 3)
             /              \                │
     [Port 8549]        [Port 8550]     [Port 8551]
-     Fork Gamma        Fork Delta      Fork Epsilon
-       (11105)           (11106)         (11107)
+Cardio Specialty     Emergency Care   Consortium Pharmacy
+     Clinic              Center             Network
+    (11105)             (11106)             (11107)
 ```

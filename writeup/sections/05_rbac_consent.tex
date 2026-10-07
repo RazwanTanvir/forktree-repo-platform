@@ -1,0 +1,78 @@
+\section{Role-Based Sovereign Access Control \& Patient Consent}
+\label{sec:rbac_consent}
+
+Securing healthcare federations against unauthorized data leakage while facilitating legitimate clinical collaboration requires a defense-in-depth access architecture. This section presents our orthogonal two-tier security enforcement model, defines the consortium role hierarchy, and formalizes the sovereign patient consent engine.
+
+\begin{figure}[t]
+\centering
+\input{figures/fig6_consent_gate.tex}
+\caption{Patient Sovereign Consent Gatekeeper Flowchart. Traversal queries targeting clinical records for patient $P_k$ on chain $C_i$ are dynamically evaluated against the on-chain consent registry $\mathcal{C}(P_k, C_i)$ prior to ciphertext decryption and hash verification.}
+\label{fig:consent_gate}
+\end{figure}
+
+\subsection{Orthogonal Two-Layer Security Model}
+To prevent both presentation-tier bypasses and smart contract privilege escalations, BlockchainForkTree enforces security across two decoupled, complementary architectural layers:
+\begin{enumerate}
+    \item \textbf{Smart Contract Verification Layer:} At the EVM execution tier, every state-modifying function in \texttt{ConsortiumGovernance.sol} and \texttt{BlockData.sol} verifies the cryptographic identity of the caller (\texttt{msg.sender}). Caller addresses are validated against the organizational registry $\mathcal{O}$ and role authorization mappings stored in the state trie. Any transaction submitted by an unauthorized address immediately triggers an EVM opcode \texttt{REVERT}, reverting all state modifications and consuming minimal execution gas.
+    \item \textbf{Presentation-Tier Route Scoping:} At the application programming interface (API) and web interface tier, the Express server (\texttt{server.js}) implements strict cryptographic persona jail-scoping. API routes inspecting inter-organizational message queues and clinical observation stores enforce deterministic query filters parameterized by the authenticated user's bound \texttt{networkId} and role classification. Privileged administrative interfaces (e.g., fork spawning wizards, project creation forms) are completely omitted from the client Document Object Model (DOM) for non-administrative roles, preventing unauthorized interface inspection and reconnaissance.
+\end{enumerate}
+
+[Note / Expansion Opportunity: The dual-layer security model can be formalized as a non-interference theorem in programming language theory, proving that lower-privilege personas can never induce state observable by higher-privilege observers.]
+
+\subsection{Formal Persona Permission Matrix}
+We categorize consortium stakeholders into six orthogonal personas with strictly delineated operational boundaries:
+\begin{itemize}
+    \item \texttt{STEERING\_COUNCIL}: Executive governing body authorized to instantiate root federated projects and adjust global protocol parameters.
+    \item \texttt{ORG\_ADMIN}: Institutional administrator authorized to submit fork proposals, vote on active network ballots, and register local node daemons.
+    \item \texttt{CLINICIAN}: Licensed medical practitioner authorized to author encounters, conditions, and dispatch diagnostic service orders for assigned patients.
+    \item \texttt{SPECIALIST}: Laboratory pathologist or pharmacist authorized to inspect assigned diagnostic orders and commit verified clinical reports and medication dispensations.
+    \item \texttt{AUDITOR}: Independent regulatory observer possessing read-only privileges to verify on-chain SHA-256 digests and audit topological lineage.
+    \item \texttt{PATIENT}: Sovereign health consumer possessing exclusive authority to inspect personal longitudinal health records and dynamically grant or revoke access consent.
+\end{itemize}
+
+Table~\ref{tab:rbac} details the complete Role-Based Access Control (RBAC) permission matrix across the platform.
+
+\begin{table*}[t]
+\centering
+\caption{Role-Based Access Control (RBAC) Persona Permission Matrix}
+\label{tab:rbac}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\textwidth}{p{3.8cm}*{6}{>{\centering\arraybackslash}X}}
+\toprule
+\textbf{Role Classification} & \textbf{Administer Projects} & \textbf{Request/Vote Forks} & \textbf{Author Clinical Records} & \textbf{Fulfill Orders (Lab/Rx)} & \textbf{Verify Audit Hashes} & \textbf{Sovereign Consent} \\
+\midrule
+\texttt{STEERING\_COUNCIL} & \checkmark & \checkmark & $\times$   & $\times$   & \checkmark & $\times$   \\
+\texttt{ORG\_ADMIN}        & $\times$   & \checkmark & $\times$   & $\times$   & \checkmark & $\times$   \\
+\texttt{CLINICIAN}        & $\times$   & $\times$   & \checkmark & $\times$   & $\times$   & $\times$   \\
+\texttt{SPECIALIST}       & $\times$   & $\times$   & $\times$   & \checkmark & $\times$   & $\times$   \\
+\texttt{AUDITOR}          & $\times$   & $\times$   & $\times$   & $\times$   & \checkmark & $\times$   \\
+\texttt{PATIENT}          & $\times$   & $\times$   & $\times$   & $\times$   & $\times$   & \checkmark \\
+\bottomrule
+\end{tabularx}
+\end{table*}
+
+[Note / Expansion Opportunity: The RBAC matrix can be augmented with temporal delegation primitives (e.g., temporary 24-hour emergency clinician access) to support urgent trauma care without permanent privilege escalation.]
+
+\subsection{Sovereign Patient Consent Model}
+Under HIPAA \S~164.508~\cite{hipaa1996} and GDPR Article 6(1)(a)~\cite{gdpr2016}, cross-organizational processing of Protected Health Information requires demonstrable, freely given, and revocable subject consent. BlockchainForkTree operationalizes this statutory requirement through an on-chain dynamic consent gatekeeper (Fig.~\ref{fig:consent_gate}).
+
+\begin{definition}[Sovereign Consent State Function]
+For any registered patient $P_k$ and healthcare institution represented by blockchain $C_i$, the consent state $\mathcal{C}(P_k, C_i) \in \{\text{Granted}, \text{Revoked}\}$ is recorded in an on-chain mapping within \texttt{ConsortiumGovernance.sol}:
+\begin{equation}
+\mathcal{C}: \mathcal{P}_{\text{patients}} \times V \to \{\text{Granted}, \text{Revoked}\}
+\end{equation}
+\end{definition}
+
+During longitudinal EHR reconstruction or inter-institutional clinical querying, the resolution function $\text{VisibleRecords}(P_k, C_i)$ dynamically filters the returned observation set:
+\begin{equation}
+\text{VisibleRecords}(P_k, C_i) = \begin{cases} 
+\mathcal{R}(P_k, C_i) & \text{if } \mathcal{C}(P_k, C_i) \equiv \text{Granted} \\
+\emptyset & \text{if } \mathcal{C}(P_k, C_i) \equiv \text{Revoked}
+\end{cases}
+\end{equation}
+where $\mathcal{R}(P_k, C_i)$ denotes the set of clinical records for $P_k$ committed on chain $C_i$.
+
+Patients update their consent preferences asynchronously via the web portal by signing an on-chain transaction with their private key, invoking \texttt{setConsent(institutionId, status)}. If a patient revokes consent for Hospital $C_1$, subsequent traversal algorithms executing on behalf of an external provider immediately receive an empty set for $C_1$, while cryptographic audit hashes remain immutably anchored for malpractice verification. This mechanism provides mathematical guarantees of compliance with GDPR Article 7(3) (``The data subject shall have the right to withdraw his or her consent at any time'') without compromising the historical integrity of the underlying ledger.
+
+[Note / Expansion Opportunity: Future work could investigate fine-grained semantic consent policies where patients grant access to specific clinical categories (e.g., cardiology vitals) while revoking sensitive behavioral health encounters.]

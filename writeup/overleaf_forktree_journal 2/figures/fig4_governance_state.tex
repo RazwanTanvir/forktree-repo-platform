@@ -1,0 +1,83 @@
+\begin{tikzpicture}[
+    scale=0.88, transform shape,
+    font=\sffamily\footnotesize,
+    node distance=1.5cm and 1.8cm,
+    stateNode/.style={
+        rectangle, rounded corners=5pt, draw=blue!80!black, line width=1.1pt,
+        fill=blue!8, text width=3.8cm, align=center, inner sep=6pt,
+        drop shadow={opacity=0.12, shadow xshift=1.5pt, shadow yshift=-1.5pt}
+    },
+    decisionNode/.style={
+        diamond, draw=orange!90!black, line width=1.1pt, fill=orange!12,
+        text width=2.6cm, align=center, inner sep=2pt, aspect=1.8
+    },
+    actionNode/.style={
+        rectangle, rounded corners=3pt, draw=teal!80!black, line width=1.1pt,
+        fill=teal!10, text width=4.2cm, align=center, inner sep=5pt
+    },
+    terminalNode/.style={
+        rectangle, rounded corners=5pt, draw=purple!80!black, line width=1.2pt,
+        fill=purple!12, text width=4.0cm, align=center, inner sep=6pt
+    },
+    rejectNode/.style={
+        rectangle, rounded corners=5pt, draw=red!80!black, line width=1.1pt,
+        fill=red!8, text width=3.2cm, align=center, inner sep=5pt
+    },
+    transArrow/.style={
+        -{Stealth[length=6pt, width=4pt]}, line width=1.1pt, draw=gray!80!black
+    },
+    labelStyle/.style={
+        font=\sffamily\scriptsize\bfseries, fill=white, inner sep=2pt, rounded corners=2pt
+    }
+]
+
+% Nodes
+\node[stateNode] (draft) {
+    \textbf{1. Proposal Drafted}\\
+    \texttt{submitForkProposal}\\
+    $\Pi = (N_{\text{new}}, P_{\text{new}}, N_{\text{parent}}, \beta, \mathcal{F}_{\text{caps}})$\\
+    \textit{Caller} $\in \mathcal{A}_{\text{org\_admin}}$
+};
+
+\node[stateNode, right=1.6cm of draft] (voting) {
+    \textbf{2. Active Ballot}\\
+    \texttt{voteOnProposal(id, support)}\\
+    ECDSA Signature Check\\
+    Tally: $(v_{\text{for}}, v_{\text{against}})$
+};
+
+\node[decisionNode, right=1.6cm of voting] (quorum) {
+    \textbf{Predicate $\Phi(\Pi)$}\\
+    $v_{\text{for}} \ge \lceil |\mathcal{O}|/2 \rceil$\\
+    $\land\ v_{\text{for}} > v_{\text{against}}$
+};
+
+\node[rejectNode, below=1.2cm of quorum] (rejected) {
+    \textbf{Proposal Rejected}\\
+    Status $\leftarrow$ \texttt{REJECTED}\\
+    Deposit Forfeited / Logged
+};
+
+\node[actionNode, above right=0.8cm and 1.4cm of quorum] (approved) {
+    \textbf{3. Atomic Execution}\\
+    \texttt{executeForkProposal(id)}\\
+    $\text{adj}[N_{\text{parent}}] \leftarrow \text{adj}[N_{\text{parent}}] \cup \{N_{\text{new}}\}$\\
+    Emit \texttt{ForkApproved} Event
+};
+
+\node[terminalNode, below=1.4cm of approved] (daemon) {
+    \textbf{4. Runtime Daemon Spawn}\\
+    \texttt{MultiChainEngine}\\
+    1. Bind Port $P_{\text{new}}$ / Chain ID $N_{\text{new}}$\\
+    2. Deploy \texttt{BlockData.sol}\\
+    3. Initialize Local State Trie
+};
+
+% Transitions
+\draw[transArrow] (draft) -- node[labelStyle, above] {On-Chain Tx} (voting);
+\draw[transArrow] (voting) -- node[labelStyle, above] {Voting Closes} (quorum);
+\draw[transArrow] (quorum) -- node[labelStyle, right, text=red!80!black] {No (Failed)} (rejected);
+\draw[transArrow] (quorum) |- node[labelStyle, above, text=teal!80!black] {Yes ($\Phi(\Pi) = \text{true}$)} (approved);
+\draw[transArrow] (approved) -- node[labelStyle, right] {Socket Trigger} (daemon);
+
+\end{tikzpicture}

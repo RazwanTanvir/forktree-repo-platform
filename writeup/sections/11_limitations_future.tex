@@ -1,0 +1,20 @@
+\section{Limitations \& Future Research Directions}
+\label{sec:limitations_future}
+
+While the theoretical proofs and empirical benchmarks validate the feasibility of BlockchainForkTree, several technical limitations and research opportunities warrant examination prior to continental-scale clinical deployments.
+
+\subsection{Technical Limitations}
+The current prototype implementation utilizes our lightweight, zero-dependency Node.js JSON-RPC daemon (\texttt{chainEngine.js}), which was specifically engineered to eliminate fragile native C++ bindings and enable rapid local testbed evaluations. In enterprise hospital environments, this daemon must be transitioned to battle-tested enterprise Ethereum clients, such as Hyperledger Besu or Go-Ethereum (Geth), running production-grade Byzantine fault tolerant consensus algorithms such as Istanbul Byzantine Fault Tolerance (IBFT 2.0)~\cite{saltini2020ibft} or QBFT. IBFT 2.0 provides immediate, deterministic block finality with zero fork reorganizations, a critical requirement for time-sensitive surgical telemetry and emergency trauma documentation. Additionally, the off-chain vault architecture currently relies on local authenticated AES-256-GCM storage with symmetric master keys. While highly efficient, this introduces a key-management dependency: if a hospital's key management system experiences an unrecoverable failure without adequate multi-site backups, associated off-chain records cannot be decrypted, even though their on-chain SHA-256 digests remain immutably anchored.
+
+[Note / Expansion Opportunity: Future resilience studies could evaluate threshold key recovery using Shamir's Secret Sharing ($k$-of-$n$) distributed across peer hospital consortium members to prevent catastrophic key loss.]
+
+\subsection{Future Research Roadmaps}
+Several compelling research avenues arise from this work to further advance decentralized healthcare informatics:
+\begin{enumerate}
+    \item \textbf{Zero-Knowledge Demographic Matching (zk-SNARKs):} Currently, cross-chain patient discovery relies on standard patient identifiers ($V_{\text{target}}$). Integrating zero-knowledge Succinct Non-Interactive Arguments of Knowledge (zk-SNARKs)~\cite{sasson2014zerocash} would enable probabilistic patient identity matching across independent hospital forks without revealing plaintext demographic strings (e.g., matching patients on hashed birthdates and partial demographic vectors).
+    \item \textbf{Layer-2 Zero-Knowledge Rollups on Acute Hospital Forks:} While the fork-tree architecture scales horizontally across institutions, individual acute care hospitals may generate tens of thousands of telemetry data points per minute during regional health crises. Deploying Layer-2 ZK-Rollups directly on top of specialized hospital forks could aggregate thousands of local vital sign readings into a single succinct cryptographic proof committed to the hospital's base chain, driving per-record gas costs to near-zero.
+    \item \textbf{Decentralized Hardware Security Module (HSM) Key Federation:} Developing standardized multi-party computation (MPC) protocols linking hospital on-premise HSMs (implementing PKCS\#11) with cloud key management services would ensure that no single institutional administrator can compromise consortium master decryption keys.
+    \item \textbf{Cross-Fork Federated Machine Learning:} Combining the fork-tree lineage structure with federated learning algorithms could enable regional healthcare systems to train deep neural networks on distributed oncology and pathology datasets across specialized laboratory forks without transferring confidential patient records outside institutional firewalls.
+\end{enumerate}
+
+[Note / Expansion Opportunity: A detailed formal model for zero-knowledge cross-chain demographic matching can be formulated, proving zero-knowledge leakage under the standard Decisional Diffie-Hellman (DDH) assumption.]

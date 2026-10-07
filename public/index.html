@@ -60,11 +60,14 @@
       <button class="tab-btn" data-tab="roles" data-roles="STEERING_COUNCIL,ORG_ADMIN">
         <span class="tab-icon">👥</span> Roles & Projects
       </button>
-      <button class="tab-btn" data-tab="messaging" data-roles="CLINICIAN,SPECIALIST,ORG_ADMIN">
+      <button class="tab-btn" data-tab="messaging" data-roles="CLINICIAN,SPECIALIST,ORG_ADMIN,STEERING_COUNCIL,AUDITOR">
         <span class="tab-icon">📨</span> FHIR Gateway
       </button>
-      <button class="tab-btn" data-tab="data" data-roles="CLINICIAN,SPECIALIST,AUDITOR,PATIENT">
+      <button class="tab-btn" data-tab="data" data-roles="CLINICIAN,SPECIALIST,AUDITOR,PATIENT,ORG_ADMIN">
         <span class="tab-icon">🩺</span> Longitudinal EHR
+      </button>
+      <button class="tab-btn" data-tab="blocks" data-roles="STEERING_COUNCIL,ORG_ADMIN,AUDITOR,CLINICIAN,SPECIALIST">
+        <span class="tab-icon">📦</span> Blockchain Ledger
       </button>
       <button class="tab-btn" data-tab="request-fork" data-roles="ORG_ADMIN,STEERING_COUNCIL">
         <span class="tab-icon">🌿</span> Request Fork
@@ -72,14 +75,14 @@
       <button class="tab-btn" data-tab="governance" data-roles="STEERING_COUNCIL,ORG_ADMIN,AUDITOR">
         <span class="tab-icon">🏛️</span> Governance
       </button>
-      <button class="tab-btn" data-tab="search" data-roles="CLINICIAN,SPECIALIST,AUDITOR">
+      <button class="tab-btn" data-tab="search" data-roles="STEERING_COUNCIL,AUDITOR">
         <span class="tab-icon">🔍</span> Multi-Chain Search
       </button>
-      <button class="tab-btn" data-tab="tree" data-roles="STEERING_COUNCIL,ORG_ADMIN,AUDITOR">
-        <span class="tab-icon">🌳</span> Fork Tree
+      <button class="tab-btn" data-tab="tree" data-roles="STEERING_COUNCIL,AUDITOR">
+        <span class="tab-icon">🌳</span> Fork Tree Topology
       </button>
-      <button class="tab-btn" data-tab="nodes" data-roles="STEERING_COUNCIL,ORG_ADMIN,AUDITOR">
-        <span class="tab-icon">⚡</span> Nodes Status
+      <button class="tab-btn" data-tab="nodes" data-roles="STEERING_COUNCIL,AUDITOR">
+        <span class="tab-icon">⚡</span> Network Overview
       </button>
       <button class="tab-btn" data-tab="create-fork" data-roles="STEERING_COUNCIL">
         <span class="tab-icon">➕</span> Direct Spawner
@@ -177,51 +180,554 @@
     <!-- TAB: Longitudinal EHR Explorer (Clinicians, Specialists, Auditors, Patients) -->
     <section id="tab-data" class="tab-content">
       <!-- Author Clinical Record Card (Visible ONLY to Clinicians) -->
-      <div class="card" id="author-record-card" style="margin-bottom: 20px;">
-        <div class="card-header">
-          <div>
-            <h3>Author Real HL7 FHIR Patient Record</h3>
-            <p class="card-subtitle">Digitally sign and commit clinical encounter or observation to blockchain ledger</p>
+      <div class="card clinical-ehr-card" id="author-record-card" style="margin-bottom: 24px;">
+        <div class="card-header ehr-card-header">
+          <div class="ehr-title-group">
+            <div class="ehr-title-icon">🩺</div>
+            <div>
+              <h3>Institutional EHR Clinical Documentation</h3>
+              <p class="card-subtitle">Epic / Cerner Standardized FHIR R4 Resource Synthesis & Multi-Chain Cryptographic Anchoring</p>
+            </div>
           </div>
-          <span class="badge badge-success">Clinician Portal</span>
+          <div class="ehr-header-badges">
+            <span class="badge badge-success" id="ehr-station-badge">Clinician Station: Dr. Alice Chen, MD</span>
+            <span class="badge badge-outline">🔐 ECDSA secp256k1 Signed</span>
+          </div>
         </div>
-        <div class="card-body">
-          <form id="form-add-clinical-record">
-            <div class="form-row-3">
+
+        <div class="card-body ehr-card-body">
+          <!-- 1. Patient Context Demographics Banner -->
+          <div class="ehr-patient-banner">
+            <div class="ehr-patient-primary">
+              <div class="ehr-patient-avatar" id="ehr-patient-avatar-box">
+                <span class="avatar-icon" id="ehr-patient-avatar">👩</span>
+              </div>
+              <div class="ehr-patient-demographics">
+                <div class="ehr-patient-select-row">
+                  <label for="ehr-patient-select" class="ehr-label-inline">Active Chart / Patient:</label>
+                  <select id="ehr-patient-select" class="form-control ehr-patient-select">
+                    <option value="P-101" data-name="Sarah Connor" data-gender="Female" data-age="42" data-dob="1984-05-12" data-mrn="MRN-101-SC" data-bed="West Wing - Telemetry 304B" data-allergy="Penicillin (Anaphylaxis)" data-allergy-severity="severe" selected>Sarah Connor (MRN-101-SC | 42y Female)</option>
+                    <option value="P-102" data-name="Robert Chen" data-gender="Male" data-age="57" data-dob="1968-11-23" data-mrn="MRN-102-RC" data-bed="East Pavilion - Endocrinology 212" data-allergy="Sulfa Antibiotics (Rash / Urticaria)" data-allergy-severity="moderate">Robert Chen (MRN-102-RC | 57y Male)</option>
+                    <option value="P-103" data-name="Maria Garcia" data-gender="Female" data-age="34" data-dob="1992-03-14" data-mrn="MRN-103-MG" data-bed="Emergency Dept - Bed 04" data-allergy="NKDA (No Known Drug Allergies)" data-allergy-severity="none">Maria Garcia (MRN-103-MG | 34y Female)</option>
+                    <option value="custom" data-name="Custom Patient" data-gender="Unspecified" data-age="--" data-dob="YYYY-MM-DD" data-mrn="CUSTOM" data-bed="Outpatient Station" data-allergy="Unverified" data-allergy-severity="none">➕ Other Patient MRN / Enter Custom ID...</option>
+                  </select>
+                </div>
+                
+                <div id="ehr-patient-custom-wrap" class="ehr-custom-patient-row" style="display: none; margin-top: 6px;">
+                  <input type="text" id="rec-patient-id-custom" class="form-control form-control-sm" placeholder="Enter custom Patient ID (e.g. Patient/P-104 or MRN-5544)">
+                </div>
+
+                <div class="ehr-patient-details-strip">
+                  <span class="ehr-patient-name" id="ehr-patient-name">Sarah Connor</span>
+                  <span class="ehr-dot-sep">•</span>
+                  <span id="ehr-patient-gender">Female</span>
+                  <span class="ehr-dot-sep">•</span>
+                  <span id="ehr-patient-age">42 yrs</span>
+                  <span class="ehr-dot-sep">•</span>
+                  <span>DOB: <strong id="ehr-patient-dob">1984-05-12</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Status Pills Grid -->
+            <div class="ehr-status-pills">
+              <div class="ehr-status-pill pill-mrn">
+                <span class="pill-label">MRN / ID</span>
+                <span class="pill-value font-mono font-bold" id="ehr-patient-mrn">MRN-101-SC (P-101)</span>
+              </div>
+              <div class="ehr-status-pill pill-location">
+                <span class="pill-label">Bed / Location</span>
+                <span class="pill-value" id="ehr-patient-bed">🛏️ West Wing - Telemetry 304B</span>
+              </div>
+              <div class="ehr-status-pill pill-allergy allergy-severe" id="ehr-allergy-pill">
+                <span class="pill-label">Allergy Alert</span>
+                <span class="pill-value" id="ehr-patient-allergy">⚠️ Allergy: Penicillin</span>
+              </div>
+              <div class="ehr-status-pill pill-facility">
+                <span class="pill-label">Active Care Site</span>
+                <span class="pill-value" id="ehr-patient-facility">🏥 Metro General Hospital (Port 8547)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Documentation Form -->
+          <form id="form-add-clinical-record" class="ehr-form">
+            <input type="hidden" id="rec-patient-id" value="Patient/P-101">
+
+            <!-- Care Chain & Resource Selector Row -->
+            <div class="ehr-section-divider">
+              <span class="ehr-section-title">Clinical Context & FHIR Resource Classification</span>
+            </div>
+
+            <div class="form-row-3 ehr-selector-row">
               <div class="form-group">
                 <label for="rec-target-port">Target Care Blockchain:</label>
-                <select id="rec-target-port" class="form-control" required></select>
+                <select id="rec-target-port" class="form-control ehr-input-highlight" required></select>
+                <small class="form-hint">Locked to current clinician facility node under HIPAA § 164.502(b)</small>
               </div>
+
               <div class="form-group">
-                <label for="rec-patient-id">Patient ID / MRN:</label>
-                <input type="text" id="rec-patient-id" class="form-control" placeholder="e.g. P101 or MRN-90210" required>
-              </div>
-              <div class="form-group">
-                <label for="rec-resource-type">FHIR Resource Type:</label>
-                <select id="rec-resource-type" class="form-control" required>
-                  <option value="Encounter">Encounter (Inpatient / Outpatient Visit)</option>
-                  <option value="Observation">Observation (Vital Signs / Lab Test)</option>
-                  <option value="Condition">Condition (Problem / Clinical Diagnosis)</option>
-                  <option value="DiagnosticReport">DiagnosticReport (Lab / Pathology Results)</option>
-                  <option value="MedicationRequest">MedicationRequest (Prescription)</option>
+                <label for="rec-resource-type">FHIR R4 Resource Type:</label>
+                <select id="rec-resource-type" class="form-control ehr-resource-select font-bold" required>
+                  <option value="Encounter" selected>Encounter (Inpatient / Emergency Visit)</option>
+                  <option value="Observation">Observation (Vital Signs / Lab Values / Assessments)</option>
+                  <option value="Condition">Condition (Problem List & Clinical Diagnosis)</option>
+                  <option value="MedicationRequest">MedicationRequest (Electronic Prescription / CPOE)</option>
+                  <option value="DiagnosticReport">DiagnosticReport (Pathology & Lab Diagnostics)</option>
                 </select>
+                <small class="form-hint" id="ehr-resource-hint">Inpatient, emergency, or outpatient clinical touchpoint</small>
+              </div>
+
+              <div class="form-group">
+                <label for="rec-encounter-ref">Encounter Context Reference:</label>
+                <input type="text" id="rec-encounter-ref" class="form-control font-mono" value="Encounter/enc-101" placeholder="e.g. Encounter/enc-101">
+                <small class="form-hint">Causal lineage link to patient encounter on-chain</small>
               </div>
             </div>
 
-            <div class="form-row-2">
-              <div class="form-group">
-                <label for="rec-clinical-code">Clinical Coding (LOINC / ICD-10 / SNOMED):</label>
-                <input type="text" id="rec-clinical-code" class="form-control" placeholder="e.g. LOINC:24323-8 or ICD-10:E11.9" required>
+            <!-- DYNAMIC SUBFORMS CONTAINER -->
+            <div id="ehr-subforms-container" class="ehr-subforms-container">
+
+              <!-- ================= 1. ENCOUNTER SUBFORM ================= -->
+              <div id="subform-encounter" class="ehr-subform active">
+                <div class="ehr-subform-header">
+                  <span class="subform-badge">HL7 FHIR R4: Encounter</span>
+                  <span class="subform-desc">Document patient admission, emergency triage, or clinical encounter touchpoint</span>
+                </div>
+
+                <div class="form-row-3">
+                  <div class="form-group">
+                    <label for="enc-class">Admission Type (ActCode):</label>
+                    <select id="enc-class" class="form-control">
+                      <option value="IMP" selected>IMP - Inpatient Encounter (Hospital Admission)</option>
+                      <option value="EMER">EMER - Emergency Department Visit</option>
+                      <option value="AMB">AMB - Ambulatory / Outpatient Clinic</option>
+                      <option value="SS">SS - Short Stay / Observation Unit</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="enc-department">Service / Department:</label>
+                    <select id="enc-department" class="form-control">
+                      <option value="Cardiology Acute Care" selected>Cardiology Acute Care</option>
+                      <option value="Internal Medicine & Telemetry">Internal Medicine & Telemetry</option>
+                      <option value="Emergency Trauma Service">Emergency Trauma Service</option>
+                      <option value="Critical Care / Intensive Care (ICU)">Critical Care / Intensive Care (ICU)</option>
+                      <option value="Pulmonary Medicine">Pulmonary Medicine</option>
+                      <option value="Endocrinology & Diabetes Clinic">Endocrinology & Diabetes Clinic</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="enc-status">Encounter Status:</label>
+                    <select id="enc-status" class="form-control">
+                      <option value="in-progress" selected>in-progress (Active Admission)</option>
+                      <option value="finished">finished (Discharged / Completed)</option>
+                      <option value="planned">planned (Scheduled Procedure / Admission)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-row-2">
+                  <div class="form-group">
+                    <label for="enc-code-picker">Clinical Coding (SNOMED-CT / ICD-10):</label>
+                    <select id="enc-code-picker" class="form-control">
+                      <option value="SNOMED:32485007|Hospital admission" selected>SNOMED:32485007 - Hospital admission (procedure)</option>
+                      <option value="SNOMED:50849002|Emergency triage">SNOMED:50849002 - Emergency room triage (procedure)</option>
+                      <option value="SNOMED:185349003|Encounter for check up">SNOMED:185349003 - Outpatient encounter (procedure)</option>
+                      <option value="SNOMED:73770003|Emergency department patient visit">SNOMED:73770003 - Emergency department visit</option>
+                      <option value="custom">Enter custom SNOMED / ICD code...</option>
+                    </select>
+                    <input type="text" id="enc-custom-code" class="form-control font-mono" style="display: none; margin-top: 6px;" placeholder="e.g. SNOMED:4525004">
+                  </div>
+
+                  <div class="form-group">
+                    <label for="enc-disposition">Discharge Disposition / Placement:</label>
+                    <select id="enc-disposition" class="form-control">
+                      <option value="telemetry" selected>Admitted to Telemetry Floor</option>
+                      <option value="observation">Observation Unit Monitoring</option>
+                      <option value="icu">Intensive Care Unit (ICU) Transfer</option>
+                      <option value="home">Discharged to Home with Follow-Up</option>
+                      <option value="rehab">Transferred to Skilled Nursing / Rehab</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="enc-reason">Chief Complaint & Reason for Admission:</label>
+                  <textarea id="enc-reason" class="form-control font-sans" rows="2" placeholder="e.g. Patient presents with acute substernal chest pressure radiating to left arm with exertional dyspnea. Admitted for telemetry monitoring, cardiac biomarkers, and cardiology consultation.">Patient presents with acute substernal chest pressure with exertional dyspnea. Admitted for telemetry monitoring, serial cardiac enzymes, and cardiology consultation.</textarea>
+                </div>
               </div>
-              <div class="form-group">
-                <label for="rec-summary-note">Clinical Findings / Observation Value:</label>
-                <input type="text" id="rec-summary-note" class="form-control" placeholder="e.g. Blood Glucose 104 mg/dL. Reference 70-99." required>
+
+              <!-- ================= 2. OBSERVATION SUBFORM ================= -->
+              <div id="subform-observation" class="ehr-subform" style="display: none;">
+                <div class="ehr-subform-header">
+                  <span class="subform-badge">HL7 FHIR R4: Observation</span>
+                  <span class="subform-desc">Document structured vital signs, quantitative lab measurements, or clinical assessments</span>
+                </div>
+
+                <div class="form-row-3">
+                  <div class="form-group">
+                    <label for="obs-category">Observation Category:</label>
+                    <select id="obs-category" class="form-control">
+                      <option value="vital-signs" selected>Vital Signs (Physiological Metrics)</option>
+                      <option value="laboratory">Laboratory (Serum / Plasma / Chemistry)</option>
+                      <option value="exam">Physical Examination Finding</option>
+                      <option value="cardiology">Cardiology Assessment / Echocardiography</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="obs-preset-picker">Observation Type Preset:</label>
+                    <select id="obs-preset-picker" class="form-control font-bold">
+                      <option value="bp" data-code="LOINC:85354-9" data-name="Blood pressure panel with all children optional" data-cat="vital-signs" selected>Blood Pressure Panel (Systolic / Diastolic) [LOINC:85354-9]</option>
+                      <option value="hr" data-code="LOINC:8867-4" data-name="Heart rate" data-unit="/min" data-cat="vital-signs" data-low="60" data-high="100">Heart Rate [LOINC:8867-4]</option>
+                      <option value="glucose" data-code="LOINC:2345-7" data-name="Glucose [Mass/volume] in Serum or Plasma" data-unit="mg/dL" data-cat="laboratory" data-low="70" data-high="99">Fasting Blood Glucose [LOINC:2345-7]</option>
+                      <option value="spo2" data-code="LOINC:2708-6" data-name="Oxygen saturation in Arterial blood by Pulse oximetry" data-unit="%" data-cat="vital-signs" data-low="95" data-high="100">Oxygen Saturation (SpO2) [LOINC:2708-6]</option>
+                      <option value="temp" data-code="LOINC:8310-5" data-name="Body temperature" data-unit="[degF]" data-cat="vital-signs" data-low="97.0" data-high="99.0">Body Temperature [LOINC:8310-5]</option>
+                      <option value="troponin" data-code="LOINC:10839-9" data-name="Troponin I.cardiac [Mass/volume] in Serum or Plasma" data-unit="ng/mL" data-cat="laboratory" data-low="0.00" data-high="0.04">Cardiac Troponin I [LOINC:10839-9]</option>
+                      <option value="ef" data-code="LOINC:88062-5" data-name="Left ventricular Ejection fraction by 2D echo" data-unit="%" data-cat="cardiology" data-low="50" data-high="70">Left Ventricular Ejection Fraction (Echo) [LOINC:88062-5]</option>
+                      <option value="hba1c" data-code="LOINC:4548-4" data-name="Hemoglobin A1c/Hemoglobin.total in Blood" data-unit="%" data-cat="laboratory" data-low="4.0" data-high="5.6">Hemoglobin A1c (HbA1c) [LOINC:4548-4]</option>
+                      <option value="custom" data-code="LOINC:CUSTOM" data-name="Custom Observation" data-unit="" data-cat="vital-signs">➕ Custom Observation LOINC Metric...</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="obs-clinical-code">Standard LOINC Code:</label>
+                    <input type="text" id="obs-clinical-code" class="form-control font-mono" value="LOINC:85354-9" readonly>
+                  </div>
+                </div>
+
+                <!-- Dual / Single Input Container -->
+                <div id="obs-bp-row" class="form-row-3" style="background: rgba(56, 139, 253, 0.05); padding: 12px; border-radius: 8px; border: 1px dashed rgba(56, 139, 253, 0.3);">
+                  <div class="form-group">
+                    <label for="obs-bp-systolic">Systolic Blood Pressure:</label>
+                    <div class="input-with-addon">
+                      <input type="number" id="obs-bp-systolic" class="form-control font-bold" value="142" min="50" max="260">
+                      <span class="input-addon">mmHg</span>
+                    </div>
+                    <small class="form-hint">LOINC:8480-6 (Normal &lt; 120)</small>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="obs-bp-diastolic">Diastolic Blood Pressure:</label>
+                    <div class="input-with-addon">
+                      <input type="number" id="obs-bp-diastolic" class="form-control font-bold" value="88" min="30" max="160">
+                      <span class="input-addon">mmHg</span>
+                    </div>
+                    <small class="form-hint">LOINC:8462-4 (Normal &lt; 80)</small>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="obs-interpretation-bp">Interpretation Flag:</label>
+                    <select id="obs-interpretation-bp" class="form-control font-bold color-warning">
+                      <option value="H" selected>H - High (Stage 1 Hypertension)</option>
+                      <option value="N">N - Normal</option>
+                      <option value="L">L - Low (Hypotension)</option>
+                      <option value="HH">HH - Critical High (Hypertensive Urgency)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Single Numeric Observation Row -->
+                <div id="obs-single-row" class="form-row-4" style="display: none; background: rgba(56, 139, 253, 0.05); padding: 12px; border-radius: 8px; border: 1px dashed rgba(56, 139, 253, 0.3);">
+                  <div class="form-group">
+                    <label for="obs-value">Measured Value:</label>
+                    <input type="number" step="0.01" id="obs-value" class="form-control font-bold" value="104">
+                  </div>
+                  <div class="form-group">
+                    <label for="obs-unit">Unit of Measure:</label>
+                    <input type="text" id="obs-unit" class="form-control font-mono" value="mg/dL">
+                  </div>
+                  <div class="form-group">
+                    <label>Reference Range:</label>
+                    <div class="input-range-group">
+                      <input type="number" step="0.01" id="obs-ref-low" class="form-control form-control-sm font-mono" value="70" placeholder="Low">
+                      <span class="range-sep">-</span>
+                      <input type="number" step="0.01" id="obs-ref-high" class="form-control form-control-sm font-mono" value="99" placeholder="High">
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label for="obs-interpretation">Interpretation Flag:</label>
+                    <select id="obs-interpretation" class="form-control font-bold">
+                      <option value="N">N - Normal</option>
+                      <option value="A">A - Abnormal</option>
+                      <option value="H" selected>H - High</option>
+                      <option value="L">L - Low</option>
+                      <option value="HH">HH - Critical High</option>
+                      <option value="LL">LL - Critical Low</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 12px;">
+                  <label for="obs-note">Clinical Assessment & Performer Note:</label>
+                  <input type="text" id="obs-note" class="form-control" placeholder="e.g. Resting seated measurement after 5 minutes quiet rest. Mild systolic elevation." value="Resting seated measurement after 5 minutes of quiet rest. Mild systolic elevation noted.">
+                </div>
+              </div>
+
+              <!-- ================= 3. CONDITION SUBFORM ================= -->
+              <div id="subform-condition" class="ehr-subform" style="display: none;">
+                <div class="ehr-subform-header">
+                  <span class="subform-badge">HL7 FHIR R4: Condition</span>
+                  <span class="subform-desc">Document clinical problems, chronic diagnoses, or acute medical conditions</span>
+                </div>
+
+                <div class="form-row-2">
+                  <div class="form-group">
+                    <label for="cond-preset-picker">Diagnosis Picker (ICD-10-CM / SNOMED):</label>
+                    <select id="cond-preset-picker" class="form-control font-bold">
+                      <option value="ICD-10:I10" data-name="Essential (primary) hypertension" selected>ICD-10:I10 - Essential (primary) hypertension</option>
+                      <option value="ICD-10:I20.0" data-name="Unstable angina pectoris">ICD-10:I20.0 - Unstable angina pectoris</option>
+                      <option value="ICD-10:I21.9" data-name="Acute myocardial infarction, unspecified">ICD-10:I21.9 - Acute myocardial infarction, unspecified</option>
+                      <option value="ICD-10:E11.9" data-name="Type 2 diabetes mellitus without complications">ICD-10:E11.9 - Type 2 diabetes mellitus without complications</option>
+                      <option value="ICD-10:E11.65" data-name="Type 2 diabetes mellitus with hyperglycemia">ICD-10:E11.65 - Type 2 diabetes mellitus with hyperglycemia</option>
+                      <option value="ICD-10:J45.21" data-name="Mild intermittent asthma with acute exacerbation">ICD-10:J45.21 - Mild intermittent asthma with acute exacerbation</option>
+                      <option value="ICD-10:I50.9" data-name="Heart failure, unspecified">ICD-10:I50.9 - Heart failure, unspecified</option>
+                      <option value="ICD-10:N18.3" data-name="Chronic kidney disease, stage 3">ICD-10:N18.3 - Chronic kidney disease, stage 3</option>
+                      <option value="custom" data-name="Custom Diagnosis">➕ Custom Diagnosis Code...</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="cond-clinical-code">ICD-10 Clinical Code:</label>
+                    <input type="text" id="cond-clinical-code" class="form-control font-mono" value="ICD-10:I10" readonly>
+                  </div>
+                </div>
+
+                <div class="form-row-3">
+                  <div class="form-group">
+                    <label for="cond-clinical-status">Clinical Status:</label>
+                    <select id="cond-clinical-status" class="form-control">
+                      <option value="active" selected>active (Current Clinical Problem)</option>
+                      <option value="recurrence">recurrence (Recurrent Episode)</option>
+                      <option value="relapse">relapse (Disease Relapse)</option>
+                      <option value="remission">remission (In Clinical Remission)</option>
+                      <option value="resolved">resolved (Problem Resolved)</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="cond-verification-status">Verification Status:</label>
+                    <select id="cond-verification-status" class="form-control">
+                      <option value="confirmed" selected>confirmed (Objective Diagnostic Criteria Met)</option>
+                      <option value="provisional">provisional (Working Clinical Diagnosis)</option>
+                      <option value="differential">differential (Differential Diagnosis)</option>
+                      <option value="unconfirmed">unconfirmed (Suspected / Rule-Out)</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="cond-severity">Severity Level:</label>
+                    <select id="cond-severity" class="form-control">
+                      <option value="moderate" selected>Moderate Severity</option>
+                      <option value="mild">Mild Severity</option>
+                      <option value="severe">Severe / High Risk</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-row-2">
+                  <div class="form-group">
+                    <label for="cond-onset-date">Onset Date / Timing:</label>
+                    <input type="date" id="cond-onset-date" class="form-control">
+                  </div>
+                  <div class="form-group">
+                    <label for="cond-note">Clinical Staging & Diagnostic Impression:</label>
+                    <input type="text" id="cond-note" class="form-control" value="Essential hypertension confirmed on serial readings. Initiating cardioprotective ACE-inhibitor regimen.">
+                  </div>
+                </div>
+              </div>
+
+              <!-- ================= 4. MEDICATIONREQUEST SUBFORM ================= -->
+              <div id="subform-medication" class="ehr-subform" style="display: none;">
+                <div class="ehr-subform-header">
+                  <span class="subform-badge">HL7 FHIR R4: MedicationRequest</span>
+                  <span class="subform-desc">Computerized Physician Order Entry (CPOE) for electronic prescriptions and pharmacy orders</span>
+                </div>
+
+                <div class="form-row-2">
+                  <div class="form-group">
+                    <label for="med-preset-picker">Medication Formulation (RxNorm):</label>
+                    <select id="med-preset-picker" class="form-control font-bold">
+                      <option value="RxNorm:314076" data-name="Lisinopril 10 MG Oral Tablet" data-route="oral" data-sig="Take 1 tablet by mouth daily in the morning" data-qty="30" data-days="30" data-refills="3" selected>Lisinopril 10 MG Oral Tablet [RxNorm:314076]</option>
+                      <option value="RxNorm:860975" data-name="Metformin hydrochloride 500 MG Oral Tablet" data-route="oral" data-sig="500 mg orally twice daily with meals" data-qty="60" data-days="30" data-refills="5">Metformin HCl 500 MG Oral Tablet [RxNorm:860975]</option>
+                      <option value="RxNorm:197361" data-name="Amlodipine 5 MG Oral Tablet" data-route="oral" data-sig="Take 1 tablet by mouth daily" data-qty="30" data-days="30" data-refills="3">Amlodipine 5 MG Oral Tablet [RxNorm:197361]</option>
+                      <option value="RxNorm:311671" data-name="Metoprolol Succinate ER 50 MG Oral Tablet" data-route="oral" data-sig="Take 1 tablet by mouth once daily" data-qty="30" data-days="30" data-refills="3">Metoprolol Succinate ER 50 MG Oral Tablet [RxNorm:311671]</option>
+                      <option value="RxNorm:245314" data-name="Albuterol 0.09 MG/ACTUAT Inhaler" data-route="inhalation" data-sig="Inhale 2 puffs every 4-6 hours as needed for wheezing" data-qty="1" data-days="30" data-refills="2">Albuterol Inhaler 0.09 MG/ACTUAT [RxNorm:245314]</option>
+                      <option value="RxNorm:855332" data-name="Atorvastatin 40 MG Oral Tablet" data-route="oral" data-sig="Take 1 tablet by mouth daily at bedtime" data-qty="30" data-days="30" data-refills="3">Atorvastatin 40 MG Oral Tablet [RxNorm:855332]</option>
+                      <option value="custom" data-name="Custom Prescription" data-route="oral" data-sig="" data-qty="30" data-days="30" data-refills="0">➕ Custom Prescription Order...</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="med-clinical-code">RxNorm Clinical Code:</label>
+                    <input type="text" id="med-clinical-code" class="form-control font-mono" value="RxNorm:314076" readonly>
+                  </div>
+                </div>
+
+                <div class="form-row-3">
+                  <div class="form-group">
+                    <label for="med-dosage">Patient Sig / Dosage Instruction:</label>
+                    <input type="text" id="med-dosage" class="form-control font-bold" value="Take 1 tablet by mouth daily in the morning">
+                  </div>
+
+                  <div class="form-group">
+                    <label for="med-route">Route of Administration:</label>
+                    <select id="med-route" class="form-control">
+                      <option value="oral" selected>Oral (by mouth)</option>
+                      <option value="iv">Intravenous (IV)</option>
+                      <option value="subcut">Subcutaneous Injection</option>
+                      <option value="inhalation">Oral Inhalation</option>
+                      <option value="topical">Topical Application</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="med-frequency">Frequency (Sig Schedule):</label>
+                    <select id="med-frequency" class="form-control">
+                      <option value="QD" selected>QD - Once daily (morning)</option>
+                      <option value="BID">BID - Twice daily (morning & evening)</option>
+                      <option value="TID">TID - Three times daily</option>
+                      <option value="Q8H">Q8H - Every 8 hours</option>
+                      <option value="PRN">PRN - As needed for symptoms</option>
+                      <option value="QHS">QHS - At bedtime</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-row-4">
+                  <div class="form-group">
+                    <label for="med-quantity">Dispense Quantity:</label>
+                    <div class="input-with-addon">
+                      <input type="number" id="med-quantity" class="form-control font-bold" value="30" min="1">
+                      <span class="input-addon">tabs</span>
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="med-days-supply">Days Supply:</label>
+                    <div class="input-with-addon">
+                      <input type="number" id="med-days-supply" class="form-control font-bold" value="30" min="1">
+                      <span class="input-addon">days</span>
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="med-refills">Refills Authorized:</label>
+                    <input type="number" id="med-refills" class="form-control font-bold" value="3" min="0" max="11">
+                  </div>
+
+                  <div class="form-group">
+                    <label for="med-intent">Prescription Intent:</label>
+                    <select id="med-intent" class="form-control">
+                      <option value="order" selected>order (Direct Provider Order)</option>
+                      <option value="plan">plan (Care Plan Recommendation)</option>
+                      <option value="proposal">proposal (Clinical Proposal)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="med-instructions">Clinical Indication & Pharmacy Instructions:</label>
+                  <input type="text" id="med-instructions" class="form-control" value="Indication: Essential hypertension. Monitor sitting BP weekly; reassess serum creatinine & potassium in 4 weeks.">
+                </div>
+              </div>
+
+              <!-- ================= 5. DIAGNOSTICREPORT SUBFORM ================= -->
+              <div id="subform-diagnosticreport" class="ehr-subform" style="display: none;">
+                <div class="ehr-subform-header">
+                  <span class="subform-badge">HL7 FHIR R4: DiagnosticReport</span>
+                  <span class="subform-desc">Document authorized pathology findings, laboratory panels, or imaging diagnostic reports</span>
+                </div>
+
+                <div class="form-row-3">
+                  <div class="form-group">
+                    <label for="diag-section">Diagnostic Section / Service:</label>
+                    <select id="diag-section" class="form-control">
+                      <option value="CH" selected>CH - Chemistry (Biochemistry / Metabolic Panels)</option>
+                      <option value="HM">HM - Hematology (Complete Blood Counts)</option>
+                      <option value="MB">MB - Microbiology (Cultures & Sensitivity)</option>
+                      <option value="RAD">RAD - Radiology (X-Ray / CT / Ultrasound)</option>
+                      <option value="SP">SP - Surgical Pathology (Histopathology)</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="diag-preset-picker">Report Panel Preset:</label>
+                    <select id="diag-preset-picker" class="form-control font-bold">
+                      <option value="LOINC:24323-8" data-name="Comprehensive metabolic 2000 panel" data-sec="CH" selected>Comprehensive Metabolic Panel (CMP) [LOINC:24323-8]</option>
+                      <option value="LOINC:58410-2" data-name="Complete blood count (CBC) with differential" data-sec="HM">CBC with Differential [LOINC:58410-2]</option>
+                      <option value="LOINC:4548-4" data-name="HbA1c Glycated Hemoglobin Report" data-sec="CH">HbA1c Glycated Hemoglobin Report [LOINC:4548-4]</option>
+                      <option value="LOINC:30954-2" data-name="Lipid panel with direct LDL" data-sec="CH">Lipid Panel with Direct LDL [LOINC:30954-2]</option>
+                      <option value="LOINC:24357-6" data-name="Urinalysis complete panel" data-sec="CH">Urinalysis Complete Panel [LOINC:24357-6]</option>
+                      <option value="custom" data-name="Custom Diagnostic Report" data-sec="CH">➕ Custom Diagnostic Report Panel...</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="diag-clinical-code">Standard Panel LOINC:</label>
+                    <input type="text" id="diag-clinical-code" class="form-control font-mono" value="LOINC:24323-8" readonly>
+                  </div>
+                </div>
+
+                <div class="form-row-3">
+                  <div class="form-group">
+                    <label for="diag-accession">Specimen / Accession ID:</label>
+                    <input type="text" id="diag-accession" class="form-control font-mono" value="ACC-2026-90412">
+                  </div>
+
+                  <div class="form-group">
+                    <label for="diag-status">Diagnostic Status:</label>
+                    <select id="diag-status" class="form-control">
+                      <option value="final" selected>final (Pathologist Signed & Verified)</option>
+                      <option value="preliminary">preliminary (Interim Laboratory Results)</option>
+                      <option value="amended">amended (Corrected Diagnostic Report)</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="diag-effective-date">Specimen Collection Time:</label>
+                    <input type="datetime-local" id="diag-effective-date" class="form-control">
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="diag-conclusion">Pathologist / Diagnostic Conclusion & Clinical Summary:</label>
+                  <textarea id="diag-conclusion" class="form-control" rows="2" placeholder="e.g. Comprehensive metabolic panel within normal limits. Cardiac biomarkers non-reactive. Fasting blood glucose mildly elevated at 104 mg/dL.">Cardiac biomarkers within normal limits. Fasting blood glucose borderline elevated at 104 mg/dL. Renal and electrolyte parameters within physiologic baselines.</textarea>
+                </div>
+              </div>
+
+            </div> <!-- /ehr-subforms-container -->
+
+            <!-- Real-Time HL7 FHIR R4 JSON Inspection Accordion -->
+            <div class="ehr-json-preview-container">
+              <div class="ehr-preview-header" id="ehr-preview-toggle">
+                <div class="ehr-preview-title">
+                  <span class="preview-icon">⚡</span>
+                  <strong>Live Synthesized HL7 FHIR R4 Payload</strong>
+                  <span class="badge badge-primary" id="preview-fhir-type-badge">Encounter</span>
+                </div>
+                <div class="ehr-preview-meta">
+                  <span class="preview-hash-lbl">Target SHA-256 Digest:</span>
+                  <span class="preview-hash font-mono text-truncate" id="preview-sha256-hash">Calculating...</span>
+                  <span class="preview-toggle-indicator" id="preview-toggle-icon">▼</span>
+                </div>
+              </div>
+              <div class="ehr-preview-body" id="ehr-preview-body">
+                <pre class="json-code-block font-mono"><code id="ehr-live-json">{}</code></pre>
               </div>
             </div>
 
-            <button type="submit" id="btn-commit-record" class="btn btn-primary">
-              🔒 Commit Record with Clinician Signature
-            </button>
+            <!-- Submit Action Bar -->
+            <div class="ehr-action-bar">
+              <div class="ehr-action-disclaimer">
+                <span>🔒 <strong>Cryptographic Audit Guarantee:</strong> Submission generates an on-chain transaction signed by your clinician private key, calculates a SHA-256 state root, and stores the encrypted document in the off-chain vault.</span>
+              </div>
+              <button type="submit" id="btn-commit-record" class="btn btn-primary btn-lg ehr-btn-commit">
+                🔒 Finalize, Sign & Commit Clinical Record
+              </button>
+            </div>
           </form>
         </div>
       </div>
@@ -259,6 +765,151 @@
             <div class="empty-state">
               <span style="font-size: 2rem; display: block; margin-bottom: 0.5rem;">🩺</span>
               No clinical records found. Clinicians can author and commit the first patient record using the form above.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: Multi-Fork Chain & Block Explorer -->
+    <section id="tab-blocks" class="tab-content">
+      <!-- Security & Regulatory Compliance Notice Banner -->
+      <div class="security-compliance-banner">
+        <div class="security-banner-header">
+          <span class="security-icon">🛡️</span>
+          <div>
+            <h4>Consortium Multi-Fork Audit & Healthcare Privacy Verification</h4>
+            <p class="security-desc">
+              <strong>Regulatory Notice:</strong> Cross-fork block inspection operates under strict 
+              <em>HIPAA § 164.502(b) Minimum Necessary</em> and <em>GDPR Art. 5(1)(f) Confidentiality</em> safeguards.
+              Authorized Auditors & Steering Council members audit cryptographic block continuity (parent hashes, state roots, SHA-256 anchors).
+              Decrypted Protected Health Information (PHI) is unsealed exclusively for authorized clinicians holding patient treatment consent.
+            </p>
+          </div>
+          <span class="badge badge-success" id="explorer-security-mode">Auditor & Consent Enforced</span>
+        </div>
+      </div>
+
+      <!-- Controls Row: Chain Selection & View Mode -->
+      <div class="card explorer-controls-card">
+        <div class="card-body">
+          <div class="explorer-nav-toolbar">
+            <div class="explorer-chain-selector-group">
+              <label for="explorer-chain-select" class="toolbar-label">Select Blockchain Fork:</label>
+              <select id="explorer-chain-select" class="form-control explorer-select">
+                <!-- Dynamically populated -->
+              </select>
+            </div>
+
+            <div class="explorer-mode-group">
+              <label class="toolbar-label">Explorer View Mode:</label>
+              <div class="toggle-pill-group">
+                <button type="button" class="toggle-pill active" id="btn-mode-blocks" data-mode="blocks">
+                  📦 Chain Block Stream
+                </button>
+                <button type="button" class="toggle-pill" id="btn-mode-lineage" data-mode="lineage">
+                  🧬 Patient Lineage Trajectory
+                </button>
+              </div>
+            </div>
+
+            <div class="explorer-patient-filter-group" id="explorer-patient-filter-group" style="display: none;">
+              <label for="explorer-patient-select" class="toolbar-label">Target Patient:</label>
+              <select id="explorer-patient-select" class="form-control form-control-sm">
+                <option value="Patient/P-101">Patient/P-101 (Sarah Connor)</option>
+                <option value="Patient/P-102">Patient/P-102 (Robert Chen)</option>
+                <option value="Patient/P-103">Patient/P-103 (Maria Garcia)</option>
+              </select>
+            </div>
+
+            <div class="explorer-actions">
+              <button type="button" id="btn-refresh-blocks" class="btn btn-outline btn-sm">
+                🔄 Refresh Blocks
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Selected Chain Metrics Bar -->
+      <div class="chain-metrics-summary-bar" id="chain-metrics-bar">
+        <div class="metric-box">
+          <span class="metric-label">Selected Chain</span>
+          <span class="metric-value font-bold" id="metric-chain-name">Loading...</span>
+        </div>
+        <div class="metric-box">
+          <span class="metric-label">Network ID & Port</span>
+          <span class="metric-value font-mono" id="metric-net-port">-</span>
+        </div>
+        <div class="metric-box">
+          <span class="metric-label">Current Block Height</span>
+          <span class="metric-value color-primary font-bold" id="metric-block-height">0</span>
+        </div>
+        <div class="metric-box">
+          <span class="metric-label">Fork Lineage Anchor</span>
+          <span class="metric-value" id="metric-fork-lineage">-</span>
+        </div>
+        <div class="metric-box">
+          <span class="metric-label">Anchored FHIR Records</span>
+          <span class="metric-value color-success font-bold" id="metric-total-records">0</span>
+        </div>
+        <div class="metric-box">
+          <span class="metric-label">Consensus Status</span>
+          <span class="badge badge-success" id="metric-chain-status">Online</span>
+        </div>
+      </div>
+
+      <!-- VIEW 1: Chain Block Stream View (Default) -->
+      <div id="view-chain-blocks" class="explorer-view-panel">
+        <div class="grid-2-col explorer-grid">
+          <!-- Left: Mined Blocks Feed -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h3>Mined Block Feed</h3>
+                <p class="card-subtitle">Cryptographic ledger blocks committed to this chain</p>
+              </div>
+              <span class="badge badge-outline" id="badge-blocks-count">0 Blocks</span>
+            </div>
+            <div class="card-body">
+              <div id="blocks-feed-container" class="blocks-feed-container">
+                <div class="empty-state">Loading blocks...</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Deep Block Inspector & FHIR Data -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h3 id="inspector-block-title">Block Data Inspector</h3>
+                <p class="card-subtitle" id="inspector-block-subtitle">Select any block from the feed to inspect EVM header & committed records</p>
+              </div>
+              <span class="badge badge-secondary" id="inspector-block-badge">No Block Selected</span>
+            </div>
+            <div class="card-body" id="inspector-block-body">
+              <div class="empty-state">
+                <span style="font-size: 2.5rem; display: block; margin-bottom: 0.5rem;">📦</span>
+                Select a block on the left to inspect its raw header, transaction receipts, and committed FHIR patient records.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 2: Patient Lineage Trajectory View -->
+      <div id="view-patient-lineage" class="explorer-view-panel" style="display: none;">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3 id="lineage-patient-title">Patient Cross-Fork Lineage Trajectory</h3>
+              <p class="card-subtitle">Deterministic causal journey across autonomous healthcare organizations</p>
+            </div>
+            <span class="badge badge-primary" id="badge-lineage-hops">0 Touchpoints</span>
+          </div>
+          <div class="card-body">
+            <div id="patient-lineage-timeline" class="patient-lineage-timeline">
+              <div class="empty-state">Select a target patient to trace their multi-chain trajectory.</div>
             </div>
           </div>
         </div>

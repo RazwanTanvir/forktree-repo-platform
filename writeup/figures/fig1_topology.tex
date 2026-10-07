@@ -1,0 +1,100 @@
+\begin{tikzpicture}[
+    font=\sffamily\footnotesize,
+    repo/.style={
+        rectangle, rounded corners=4pt, draw=black, line width=1.3pt,
+        fill=gray!20, text width=16.4cm, align=center, inner sep=6pt,
+        drop shadow={opacity=0.1, shadow xshift=1.5pt, shadow yshift=-1.5pt}
+    },
+    root/.style={
+        rectangle, rounded corners=4pt, draw=black, line width=1.2pt,
+        fill=gray!10, text width=13.6cm, align=center, inner sep=5pt,
+        drop shadow={opacity=0.1, shadow xshift=1.5pt, shadow yshift=-1.5pt}
+    },
+    orgL1/.style={
+        rectangle, rounded corners=4pt, draw=black, line width=1pt,
+        fill=white, text width=7.2cm, align=center, inner sep=5pt,
+        drop shadow={opacity=0.08, shadow xshift=1pt, shadow yshift=-1pt}
+    },
+    orgL2/.style={
+        rectangle, rounded corners=3pt, draw=black!80, line width=0.8pt,
+        fill=gray!8, text width=3.4cm, align=center, inner sep=3.5pt
+    },
+    orgL2wide/.style={
+        rectangle, rounded corners=3pt, draw=black!80, line width=0.8pt,
+        fill=gray!8, text width=5.6cm, align=center, inner sep=3.5pt
+    },
+    edgeLine/.style={
+        -{Stealth[length=5pt, width=3.5pt]}, line width=1pt, draw=black, dashed
+    },
+    lineageEdge/.style={
+        -{Stealth[length=5pt, width=3.5pt]}, line width=1.1pt, draw=black
+    },
+    edgeLabel/.style={
+        font=\sffamily\scriptsize\bfseries, fill=white, inner sep=1.8pt, rounded corners=1.5pt, draw=black!60
+    }
+]
+
+% Level 0 (Top): Metadata Repository Chain
+\node[repo] (repo) at (0, 0) {
+    \textbf{\large METADATA BLOCKCHAIN: Consortium Repository Chain ($C_{\text{repo}}$)}\\
+    \vspace{1.5pt}
+    \textbf{Contract:} \texttt{ConsortiumGovernance.sol} \quad $\mid$ \quad \textbf{RPC Port:} 8545 \quad $\mid$ \quad \textbf{Network ID:} 11101\\
+    \textit{Entities:} Member Organization Directory $\bullet$ Project Federation $\bullet$ On-Chain Proposals $\Pi$ $\bullet$ Lineage Tree $\bullet$ FHIR Messaging Bus
+};
+
+% Level 0 (Sub): Root Master Patient Index
+\node[root] (root) at (0, -1.8) {
+    \textbf{\normalsize ROOT BLOCKCHAIN ($C_0$): Master Patient Index (MPI) \& Genesis Federation}\\
+    \vspace{1pt}
+    \textbf{Contract:} \texttt{BlockData.sol} \quad $\mid$ \quad \textbf{RPC Port:} 8546 \quad $\mid$ \quad \textbf{Network ID:} 11102 \quad $\mid$ \quad \textit{Scope:} Global Demographics \& Lineage Genesis
+};
+
+% Line between Repo and Root
+\draw[edgeLine] (repo) -- node[edgeLabel] {Lineage Anchoring \& Governance Consensus Oversight} (root);
+
+% Level 1: Left (Hospital) and Right (Diagnostic Lab)
+\node[orgL1] (forkA) at (-4.5, -3.8) {
+    \textbf{Metro General Hospital ($C_1$)}\\
+    \textbf{Port:} 8547 \quad $\mid$ \quad \textbf{Net ID:} 11103\\
+    \textit{Capabilities:} Encounters, Inpatient EHR, Service Orders
+};
+
+\node[orgL1] (forkB) at (4.5, -3.8) {
+    \textbf{BioLabs Diagnostic Center ($C_2$)}\\
+    \textbf{Port:} 8548 \quad $\mid$ \quad \textbf{Net ID:} 11104\\
+    \textit{Capabilities:} Pathology, Diagnostic Reports, Specimen Chain
+};
+
+% Lineage edges from Root to Level 1
+\draw[lineageEdge] (root.south -| forkA.north) -- node[edgeLabel] {Fork @ Block $\beta_{0,1} = 1$} (forkA.north);
+\draw[lineageEdge] (root.south -| forkB.north) -- node[edgeLabel] {Fork @ Block $\beta_{0,2} = 3$} (forkB.north);
+
+% Cross-chain messaging stream (Dotted thick line with clear white badge)
+\draw[<->, dotted, line width=1.3pt, draw=black] (forkA.east) -- node[above=1pt, font=\sffamily\tiny\bfseries, fill=white, draw=black, inner sep=2pt, align=center] {Asynchronous Verifiable\\HL7 FHIR Stream} (forkB.west);
+
+% Level 2: Under Hospital
+\node[orgL2] (forkC) at (-6.4, -5.6) {
+    \textbf{Cardio Specialty ($C_3$)}\\
+    \textbf{Port:} 8549 $\mid$ \textbf{Net:} 11105\\
+    \textit{Scope:} Ambulatory Vitals
+};
+
+\node[orgL2] (forkD) at (-2.6, -5.6) {
+    \textbf{Emergency Care ($C_4$)}\\
+    \textbf{Port:} 8550 $\mid$ \textbf{Net:} 11106\\
+    \textit{Scope:} Trauma Triage
+};
+
+% Level 2: Under Diagnostic Lab
+\node[orgL2wide] (forkE) at (4.5, -5.6) {
+    \textbf{Consortium Pharmacy Network ($C_5$)}\\
+    \textbf{Port:} 8551 \quad $\mid$ \quad \textbf{Net ID:} 11107\\
+    \textit{Scope:} E-Prescribing \& Rx Dispense
+};
+
+% Lineage edges from Level 1 to Level 2
+\draw[lineageEdge] (forkA.south -| forkC.north) -- node[edgeLabel] {Fork @ $\beta_{1,3} = 2$} (forkC.north);
+\draw[lineageEdge] (forkA.south -| forkD.north) -- node[edgeLabel] {Fork @ $\beta_{1,4} = 1$} (forkD.north);
+\draw[lineageEdge] (forkB.south) -- node[edgeLabel] {Fork @ $\beta_{2,5} = 3$} (forkE.north);
+
+\end{tikzpicture}

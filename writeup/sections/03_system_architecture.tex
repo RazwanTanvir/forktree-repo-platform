@@ -1,0 +1,123 @@
+\section{System Architecture \& Mathematical Formalization}
+\label{sec:system_architecture}
+
+This section establishes the formal graph-theoretic foundations of the BlockchainForkTree architecture, details the mathematical mechanics of historical state inheritance across directed blockchain lineage edges, and formalizes the hybrid cryptographic storage pipeline.
+
+\begin{figure*}[t]
+\centering
+\resizebox{\linewidth}{!}{\input{figures/fig1_topology.tex}}
+\input{figures/fig1_topology.tex}
+\caption{Federated Multi-Chain Fork-Tree Architecture. The Metadata Repository Chain ($C_{\text{repo}}$, Port 8545, Network ID 11101) governs federation topology, root projects, and inter-organizational FHIR message streams. The Root Blockchain ($C_0$, Port 8546, Network ID 11102) anchors the Master Patient Index. Specialized child forks ($C_1$--$C_5$) inherit historical state at fork blocks $\beta_{uv}$ while evolving independently.}
+\label{fig:topology}
+\end{figure*}
+
+\subsection{The Fork-Tree Arborescence Model}
+We formalize the federated healthcare network as a directed rooted tree (arborescence) $T = (V, E)$, coordinated and indexed by an independent, decoupled metadata repository chain $R$ (Fig.~\ref{fig:topology}). Formally, let $V = \{C_0, C_1, C_2, \dots, C_n\}$ denote the finite set of independent EVM-compatible blockchain instances. The vertex $C_0$ designates the \textbf{Root Blockchain} (Master Patient Index), which maintains the canonical global demographic identities and genesis registrations for all participating patients. Each child vertex $C_i \in V \setminus \{C_0\}$ represents an autonomous, institution-specific blockchain network provisioned with its own local consensus engine, isolated execution memory space, dedicated JSON-RPC interface, and independent disk-backed state trie. The edge set $E \subset V \times V \times \mathbb{N}_0$ defines directed genealogical lineage. An ordered tuple $(C_u, C_v, \beta_{uv}) \in E$ explicitly asserts that child blockchain $C_v$ was spawned from parent blockchain $C_u$ at parent block height $\beta_{uv} \in \mathbb{N}_0$. Orthogonal to $T$, the system incorporates $R = C_{\text{repo}}$, an isolated \textbf{Metadata Repository Blockchain} operating on network ID $11101$ (Port 8545). $C_{\text{repo}}$ executes the \texttt{ConsortiumGovernance.sol} smart contract, storing the global topological adjacency mapping $\text{adj}: V \to \mathcal{P}(V)$, registering member institutions, and managing cross-chain messaging streams without storing raw clinical observations.
+
+[Note / Expansion Opportunity: The arborescence definition can be expanded to allow dynamic graph re-rooting in scenarios where a regional health authority supersedes an initial hospital consortium root.]
+
+\subsection{Historical State Lineage & Cryptographic Inheritance}
+The foundational innovation enabling specialized clinical forks to operate autonomously while preserving longitudinal diagnostic context is the mathematical formalization of genealogical block height inheritance.
+
+\begin{definition}[Historical Block Lineage Inheritance]
+\label{def:lineage}
+Let $\mathcal{H}_C(k) = (\mathcal{B}_0^C, \mathcal{B}_1^C, \dots, \mathcal{B}_k^C)$ denote the sequential block history of blockchain $C$ up to block height $k$, and let $\mathcal{S}(C, k)$ denote its corresponding world state trie root. For any child blockchain $C_v$ forked from parent chain $C_u$ at lineage height $\beta_{uv}$, the state history $\mathcal{H}_{C_v}(k)$ satisfies:
+\begin{equation}
+\mathcal{H}_{C_v}(k) = \begin{cases} 
+\mathcal{H}_{C_u}(k) & \text{if } k \le \beta_{uv} \\
+\mathcal{H}_{C_v}^{\text{autonomous}}(k) & \text{if } k > \beta_{uv}
+\end{cases}
+\end{equation}
+\end{definition}
+
+This formulation guarantees that the child fork inherits patient demographic registrations and historical baseline data from the parent chain up to block $\beta_{uv}$, after which its state evolution diverges autonomously without transaction interference or cross-chain state pollution.
+
+\begin{lemma}[Acyclicity of the Fork-Tree Arborescence]
+\label{lem:acyclic}
+The directed graph $T = (V, E)$ constructed under Definition~\ref{def:lineage} is strictly acyclic, containing zero directed cycles.
+\end{lemma}
+
+\begin{proof}
+Suppose, for the sake of contradiction, that there exists a directed cycle of length $k \ge 1$ in $T$, denoted by the sequence of vertices $(C_{(0)}, C_{(1)}, \dots, C_{(k-1)}, C_{(0)})$, such that $(C_{(i)}, C_{(i+1)}, \beta_{i, i+1}) \in E$ for all $0 \le i < k-1$, and $(C_{(k-1)}, C_{(0)}, \beta_{k-1, 0}) \in E$. By construction of the consortium governance protocol on $C_{\text{repo}}$, a child chain $C_v$ can only be instantiated through an on-chain proposal $\Pi$ evaluated at physical timestamp $t_{\text{exec}}(C_v)$. Every parent chain $C_u$ must already exist and possess an active JSON-RPC endpoint at the moment $\Pi$ is submitted, establishing the strict temporal ordering $t_{\text{genesis}}(C_u) < t_{\text{exec}}(C_v)$. Applying this strict inequality along the hypothetical cycle yields:
+\begin{equation}
+t_{\text{genesis}}(C_{(0)}) < t_{\text{genesis}}(C_{(1)}) < \dots < t_{\text{genesis}}(C_{(0)})
+\end{equation}
+which implies $t_{\text{genesis}}(C_{(0)}) < t_{\text{genesis}}(C_{(0)})$, an impossible contradiction. Furthermore, because every child chain $C_v$ declares exactly one parent $C_u$ during proposal submission ($\text{in-degree}(C_v) = 1$ for all $v \neq 0$, and $\text{in-degree}(C_0) = 0$), $T$ is mathematically guaranteed to be a valid, cycle-free directed tree rooted at $C_0$.
+\end{proof}
+
+\begin{theorem}[Cryptographic Fault \& Execution Isolation]
+\label{thm:isolation}
+Let $C_i, C_j \in V$ be two distinct blockchain instances such that $C_j$ is not a descendant of $C_i$ in $T$. A Byzantine state corruption, consensus stall, or transaction throughput collapse on $C_i$ induces zero state transition failure or throughput delay on $C_j$.
+\end{theorem}
+
+\begin{proof}
+Let $\sigma_t^{(i)}$ and $\sigma_t^{(j)}$ denote the world states of chains $C_i$ and $C_j$ at global physical time $t$. The EVM state transition function on chain $C$ is defined by:
+\begin{equation}
+\sigma_{t+1}^{(C)} = \Upsilon\left(\sigma_t^{(C)}, \mathcal{T}^{(C)}\right)
+\end{equation}
+where $\mathcal{T}^{(C)}$ is the block transaction batch validated by the local consensus engine of $C$. By construction, each chain $C \in V$ executes in a decoupled OS runtime daemon listening on an isolated JSON-RPC port $P_C$ with an independent network ID $N_C$, local memory heap, and disk-persisted state trie. The set of transactions $\mathcal{T}^{(i)}$ committed on $C_i$ satisfies $\mathcal{T}^{(i)} \cap \mathcal{T}^{(j)} = \emptyset$. Because the state transition operator $\Upsilon$ depends strictly on local transactions $\mathcal{T}^{(j)}$ and previous local state $\sigma_t^{(j)}$, we have:
+\begin{equation}
+\frac{\partial \sigma_{t+1}^{(j)}}{\partial \sigma_t^{(i)}} = 0, \quad \frac{\partial \sigma_{t+1}^{(j)}}{\partial \mathcal{T}^{(i)}} = 0
+\end{equation}
+Even if $C_i$ experiences an infinite loop in a smart contract, consensus deadlock, or catastrophic node crash, the JSON-RPC daemon of $C_j$ continues evaluating $\Upsilon(\sigma_t^{(j)}, \mathcal{T}^{(j)})$ independently, confirming absolute fault isolation.
+\end{proof}
+
+\begin{theorem}[Ancestral Inheritance Consistency]
+\label{thm:consistency}
+For any child chain $C_v$ forked from $C_u$ at block height $\beta_{uv}$, any verification query targeting historical state at height $k \le \beta_{uv}$ yields identical cryptographic state proofs on both $C_u$ and $C_v$:
+\begin{equation}
+\forall k \le \beta_{uv}: \quad \mathcal{S}(C_v, k) \equiv \mathcal{S}(C_u, k)
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+By Definition~\ref{def:lineage}, $\mathcal{H}_{C_v}(\beta_{uv}) = \mathcal{H}_{C_u}(\beta_{uv})$. The block header of Ethereum-based ledgers contains the Merkle Patricia Trie root $\mathcal{S}_k = \text{Root}(\text{AccountTrie}_k)$. Because the genesis block of $C_v$ up to block $\beta_{uv}$ imports the identical block headers and transaction sequence from $C_u$, the deterministic execution of $\Upsilon$ guarantees identical intermediate state roots for all $k \in [0, \beta_{uv}]$. Hence, state proofs for patient demographics registered on the parent chain prior to $\beta_{uv}$ are identically verifiable on the child fork.
+\end{proof}
+
+[Note / Expansion Opportunity: This acyclicity and isolation proof framework can be paired with an invariant monitor algorithm that periodically audits the repository adjacency list to prevent edge tampering via compromised admin keys.]
+
+\begin{figure*}[t]
+\centering
+\input{figures/fig2_crypto_vault.tex}
+\caption{Hybrid Cryptographic Storage and Integrity Model. Confidential Protected Health Information (PHI) is authored as standard HL7 FHIR JSON ($m$), encrypted with AES-256-GCM, and stored in off-chain vaults. An immutable SHA-256 digest ($h$) is committed to the blockchain, enabling tamper-evident verification while satisfying GDPR Art.~17.}
+\label{fig:crypto}
+\end{figure*}
+
+\subsection{Hybrid Cryptographic Storage \& Integrity Model}
+To resolve the fundamental tension between distributed ledger immutability and statutory privacy regulations (HIPAA Security Rule \S~164.312 and GDPR Article 17), BlockchainForkTree enforces a strict architectural separation of concerns between off-chain confidentiality and on-chain immutability (Fig.~\ref{fig:crypto}). Let $m \in \mathcal{M}_{\text{FHIR}}$ denote an arbitrary clinical payload structured in compliance with the HL7 FHIR R4 standard. The end-to-end ingestion and anchoring pipeline executes as follows:
+
+\begin{enumerate}
+    \item \textbf{Canonical JSON Serialization:} Because raw JSON strings exhibit syntactic non-determinism (e.g., whitespace variations, non-ordered key pairs), the raw resource is normalized using the RFC 8785 JSON Canonicalization Scheme (JCS)~\cite{rundgren2020json}:
+    \begin{equation}
+    m_{\text{canon}} = \text{JCS}(m)
+    \end{equation}
+    \item \textbf{Cryptographic Hash Digest Computation:} A collision-resistant 256-bit cryptographic digest $h$ is computed over the canonical string:
+    \begin{equation}
+    h = \mathcal{H}(m) = \text{SHA-256}(m_{\text{canon}}) \in \{0, 1\}^{256}
+    \end{equation}
+    \item \textbf{Authenticated Symmetric Encryption (AEAD):} Confidentiality and payload integrity are guaranteed via AES-256 in Galois/Counter Mode (GCM)~\cite{dworkin2007recommendation, bellare2000authenticated}:
+    \begin{equation}
+    (c, \tau) = \text{AES-256-GCM}_{\mathcal{K}}(\text{raw\_utf8}(m), \text{IV}, \text{AAD})
+    \end{equation}
+    where $\mathcal{K} \in \{0, 1\}^{256}$ is the consortium master key managed within an enterprise Hardware Security Module (HSM), $\text{IV} \leftarrow_R \{0, 1\}^{128}$ is a cryptographically secure random initialization vector, $c \in \{0,1\}^*$ is the resulting ciphertext, $\tau \in \{0, 1\}^{128}$ is the Galois authentication tag, and $\text{AAD} = (\text{patientId} \parallel \text{resourceType})$ serves as authenticated associated data.
+    \item \textbf{Decentralized Content Identifier (CID):} The off-chain ciphertext is packaged into an IPFS-compatible multihash content identifier:
+    \begin{equation}
+    \text{CID} = \text{Base58Encode}(\text{Multihash}(0\text{x}12, 0\text{x}20, h)) \rightarrow \texttt{ipfs://bafk...}
+    \end{equation}
+    \item \textbf{Immutable On-Chain State Anchor:} The smart contract \texttt{BlockData.sol} executing on specialized chain $C_i$ stores strictly the metadata tuple $\Gamma$:
+    \begin{equation}
+    \begin{aligned}
+    \Gamma = (& B_i, N_i, P_i, \text{patientId}, \text{resourceType}, \\
+             & \text{clinicalCode}, h, t_{\text{block}}, \sigma_{\text{clinician}} )
+    \end{aligned}
+    \end{equation}
+    where $B_i$ is the block height, $N_i$ is the network ID, $P_i$ is the port number, $t_{\text{block}}$ is the block timestamp, and $\sigma_{\text{clinician}} = \text{ECDSA}_{\text{sk}}(\mathcal{H}(h \parallel t_{\text{block}}))$ represents the digital signature of the committing medical practitioner.
+\end{enumerate}
+
+By storing strictly the tuple $\Gamma$ on-chain, zero plaintext Protected Health Information (PHI) is ever exposed on the distributed ledger. An external auditor or clinician possessing the ciphertext $c$ and decryption key $\mathcal{K}$ can independently verify record integrity by asserting:
+\begin{equation}
+\mathcal{H}\left(\text{AES-GCM-Decrypt}_{\mathcal{K}}(c, \tau, \text{IV}, \text{AAD})\right) \equiv h
+\end{equation}
+Any intentional or accidental single-bit modification of the off-chain payload results in an immediate cryptographic verification failure, establishing absolute, tamper-evident auditability.
+
+[Note / Expansion Opportunity: The cryptographic pipeline can be augmented with homomorphic hash trees (e.g., incremental Merkle trees) to allow partial selective disclosure of specific FHIR sub-elements without decrypting the entire observation.]

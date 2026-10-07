@@ -22,19 +22,87 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 1. Get Node Statuses
+function getCallerStakeholder(req) {
+  let personas = [];
+  try {
+    const raw = fs.readFileSync(path.join(__dirname, 'config/consortiumStakeholders.json'), 'utf-8');
+    personas = JSON.parse(raw).personas || [];
+  } catch (e) {
+    personas = stakeholdersConfig.personas || [];
+  }
+
+  const callerAddr = (
+    req.headers['x-caller-address'] ||
+    req.query.callerAddress ||
+    ''
+  ).toLowerCase().trim();
+
+  if (!callerAddr) {
+    if (req.headers['x-caller-role']) {
+      return {
+        address: '0x0000000000000000000000000000000000000000',
+        role: req.headers['x-caller-role'],
+        port: parseInt(req.headers['x-caller-port'], 10) || null,
+        organizationName: req.headers['x-caller-org'] || 'Staff'
+      };
+    }
+    return null;
+  }
+
+  const match = personas.find(p => (p.address || '').toLowerCase() === callerAddr);
+  if (match) return match;
+
+  const defaultStakeholders = stakeholdersConfig.defaultStakeholders || {};
+  for (const [portStr, list] of Object.entries(defaultStakeholders)) {
+    const m = list.find(s => (s.address || '').toLowerCase() === callerAddr);
+    if (m) {
+      return {
+        address: m.address,
+        name: m.name,
+        role: m.role,
+        port: parseInt(portStr, 10),
+        organizationName: m.name
+      };
+    }
+  }
+
+  return null;
+}
+
+// 1. Get Node Statuses (Full cluster view restricted to Steering Council & Auditors)
 app.get('/api/status', async (req, res) => {
   try {
+    const caller = getCallerStakeholder(req);
     const statuses = await forkTreeService.getNodeStatuses();
-    res.json({ success: true, nodes: statuses });
+
+    // If caller is individual clinic staff (CLINICIAN, SPECIALIST, ORG_ADMIN), jail to their own node!
+    if (caller && !['STEERING_COUNCIL', 'AUDITOR'].includes(caller.role)) {
+      const myNodes = statuses.filter(s => s.port === caller.port);
+      return res.json({
+        success: true,
+        nodes: myNodes,
+        isGlobalOverview: false,
+        message: `Restricted view: displaying only ${caller.organizationName || 'your organization'} (Port ${caller.port}). Overall cluster overview is restricted to Steering Council and Auditors.`
+      });
+    }
+
+    res.json({ success: true, nodes: statuses, isGlobalOverview: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// 2. Get Fork Tree Topology
+// 2. Get Fork Tree Topology (Restricted to Steering Council & Auditors)
 app.get('/api/tree', async (req, res) => {
   try {
+    const caller = getCallerStakeholder(req);
+    if (caller && !['STEERING_COUNCIL', 'AUDITOR'].includes(caller.role)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access Denied: Full consortium fork topology overview is strictly restricted to Steering Council and Regulatory Auditors under zero-trust governance rules.'
+      });
+    }
+
     const tree = await forkTreeService.getTreeTopology();
     res.json({ success: true, tree });
   } catch (err) {
@@ -42,13 +110,29 @@ app.get('/api/tree', async (req, res) => {
   }
 });
 
-// 3. Get All Chain Data Points & HL7 Patient Records
+// 3. Get Chain Data Points & HL7 Patient Records (Scoped to Caller's Organization)
 app.get('/api/data', async (req, res) => {
   try {
-    const patientData = await forkTreeService.getAllPatientRecords();
+    const caller = getCallerStakeholder(req);
+    let patientData = await forkTreeService.getAllPatientRecords();
     const dataPoints = {};
+
+    if (caller && !['STEERING_COUNCIL', 'AUDITOR'].includes(caller.role)) {
+      if (caller.role === 'PATIENT') {
+        patientData = patientData.filter(r => {
+          const pid = (r.patientId || '').toUpperCase();
+          return pid === 'P101' || pid.includes('P101') || pid.includes('P-101');
+        });
+      } else {
+        // Individual clinic staff only sees their own organization's records!
+        patientData = patientData.filter(r => r.portNumber === caller.port);
+      }
+    }
+
     for (const chain of topology.chains) {
-      try { dataPoints[chain.port] = await forkTreeService.getChainDataPoints(chain.port); } catch (e) {}
+      if (!caller || ['STEERING_COUNCIL', 'AUDITOR'].includes(caller.role) || chain.port === caller.port) {
+        try { dataPoints[chain.port] = await forkTreeService.getChainDataPoints(chain.port); } catch (e) {}
+      }
     }
     res.json({ success: true, data: patientData, points: dataPoints });
   } catch (err) {
@@ -56,11 +140,29 @@ app.get('/api/data', async (req, res) => {
   }
 });
 
-// 4. Get Data for specific chain port
+// 4. Get Data for specific chain port (Scoped to Caller's Organization)
 app.get('/api/data/:port', async (req, res) => {
   try {
     const port = parseInt(req.params.port, 10);
-    const patientData = await forkTreeService.getChainPatientRecords(port);
+    const caller = getCallerStakeholder(req);
+
+    if (caller && !['STEERING_COUNCIL', 'AUDITOR', 'PATIENT'].includes(caller.role)) {
+      if (caller.port !== port) {
+        return res.status(403).json({
+          success: false,
+          error: `Access Denied (HIPAA § 164.502(b)): You are authenticated as staff of ${caller.organizationName || 'your organization'} (Port ${caller.port}). Access to clinical records from Port ${port} is prohibited.`
+        });
+      }
+    }
+
+    let patientData = await forkTreeService.getChainPatientRecords(port);
+    if (caller && caller.role === 'PATIENT') {
+      const allowedPid = (caller.patientId || 'P-101').toUpperCase().replace(/^PATIENT\//i, '');
+      patientData = patientData.filter(r => {
+        const pid = (r.patientId || '').toUpperCase().replace(/^PATIENT\//i, '');
+        return pid === allowedPid;
+      });
+    }
     const dataPoints = await forkTreeService.getChainDataPoints(port);
     res.json({ success: true, port, data: patientData, points: dataPoints });
   } catch (err) {
@@ -68,9 +170,17 @@ app.get('/api/data/:port', async (req, res) => {
   }
 });
 
-// 5. Run DFS / BFS Tree Search (Patient ID, Resource Type, Clinical Code, or Integer)
+// 5. Run DFS / BFS Tree Search (Restricted to Steering Council & Auditors)
 app.post('/api/search', async (req, res) => {
   try {
+    const caller = getCallerStakeholder(req);
+    if (caller && !['STEERING_COUNCIL', 'AUDITOR'].includes(caller.role)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access Denied: Consortium-wide DFS/BFS cross-chain tree traversal is restricted to Consortium Steering Council and Regulatory Auditors.'
+      });
+    }
+
     const { startNetworkId = 11102, searchValue = 'P101', algorithm = 'BFS', queryType = null } = req.body;
     const result = await forkTreeService.search(algorithm, startNetworkId, searchValue, queryType);
     res.json({ success: true, result });
@@ -323,7 +433,136 @@ app.get('/api/vault/stats', (req, res) => {
   }
 });
 
-// 10. Add HL7 Patient Health Record (Secured with Caller Address)
+// 10. Multi-Fork Block & Data Explorer Endpoints
+app.get('/api/explorer/chains', async (req, res) => {
+  try {
+    const caller = getCallerStakeholder(req);
+    const allChains = await forkTreeService.getExplorerChains();
+
+    if (caller && !['STEERING_COUNCIL', 'AUDITOR'].includes(caller.role)) {
+      // Individual healthcare organization staff: jailed to their own organization's chain!
+      const myChains = allChains.filter(c => c.port === caller.port);
+      return res.json({
+        success: true,
+        chains: myChains.length > 0 ? myChains : allChains.filter(c => c.port === caller.port),
+        isGlobalOverview: false,
+        jailedPort: caller.port,
+        organizationName: caller.organizationName
+      });
+    }
+
+    res.json({ success: true, chains: allChains, isGlobalOverview: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/explorer/chain/:port/blocks', async (req, res) => {
+  try {
+    const port = parseInt(req.params.port, 10);
+    const caller = getCallerStakeholder(req);
+
+    if (caller && !['STEERING_COUNCIL', 'AUDITOR'].includes(caller.role)) {
+      if (caller.port !== port) {
+        return res.status(403).json({
+          success: false,
+          error: `Unauthorized: Cross-organization ledger inspection is prohibited. You are restricted to ${caller.organizationName || 'your organization'} on Port ${caller.port}.`
+        });
+      }
+    }
+
+    const blocks = await forkTreeService.getChainBlocks(port);
+    res.json({ success: true, port, blocks });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/explorer/chain/:port/block/:blockNumber', async (req, res) => {
+  try {
+    const port = parseInt(req.params.port, 10);
+    const blockNumber = parseInt(req.params.blockNumber, 10);
+    const caller = getCallerStakeholder(req);
+
+    if (caller && !['STEERING_COUNCIL', 'AUDITOR'].includes(caller.role)) {
+      if (caller.port !== port) {
+        return res.status(403).json({
+          success: false,
+          error: `Unauthorized: Cross-organization block inspection is prohibited. You are restricted to ${caller.organizationName || 'your organization'} on Port ${caller.port}.`
+        });
+      }
+    }
+
+    const blockDetail = await forkTreeService.getChainBlockDetail(port, blockNumber);
+    res.json({ success: true, port, blockNumber, block: blockDetail });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/explorer/patient/:patientId/lineage', async (req, res) => {
+  try {
+    const patientId = req.params.patientId;
+    const caller = getCallerStakeholder(req);
+
+    if (caller && caller.role === 'PATIENT') {
+      const allowedPid = (caller.patientId || 'P-101').toUpperCase().replace(/^PATIENT\//i, '');
+      const reqPid = (patientId || '').toUpperCase().replace(/^PATIENT\//i, '');
+      if (reqPid !== allowedPid) {
+        return res.status(403).json({
+          success: false,
+          error: `Access Denied (HIPAA § 164.502): Sovereign Patient Privacy Rule. You are authenticated as Patient ${caller.name} (${caller.patientId || 'P-101'}) and cannot access health records for Patient ${patientId}.`
+        });
+      }
+    }
+
+    const lineage = await forkTreeService.getPatientLineageAcrossForks(patientId);
+
+    if (caller && !['STEERING_COUNCIL', 'AUDITOR', 'PATIENT'].includes(caller.role)) {
+      // Individual staff member: external facility clinical resources must be masked / shielded
+      // unless on caller's own port
+      const filteredTrajectory = (lineage.lineageTrajectory || []).map(event => {
+        if (event.port === caller.port) {
+          return event; // Full access to own org's event
+        }
+        // Shield external event details while keeping cryptographic verification anchor
+        return {
+          chainName: event.chainName,
+          port: event.port,
+          networkId: event.networkId,
+          isRoot: event.isRoot,
+          parentNetworkId: event.parentNetworkId,
+          forkBlockNumber: event.forkBlockNumber,
+          blockNumber: event.blockNumber,
+          patientId: event.patientId,
+          resourceType: event.resourceType,
+          clinicalCode: '[RESTRICTED PHI - EXTERNAL FACILITY]',
+          isShielded: true,
+          dataHash: event.dataHash,
+          blockHash: event.blockHash,
+          timestamp: event.timestamp,
+          shieldReason: `Event occurred at ${event.chainName}. Protected under HIPAA Minimum Necessary Rule. Direct inspection requires Patient Consent Directive or Inter-Org Referral.`
+        };
+      });
+
+      return res.json({
+        success: true,
+        lineage: {
+          ...lineage,
+          lineageTrajectory: filteredTrajectory,
+          isShieldedForStaff: true,
+          viewerOrganization: caller.organizationName
+        }
+      });
+    }
+
+    res.json({ success: true, lineage });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 11. Add HL7 Patient Health Record (Secured with Caller Address)
 app.post('/api/add-patient-record', async (req, res) => {
   try {
     const { port, patientId, resourceType, clinicalCode, resourceData, callerAddress } = req.body;
@@ -423,6 +662,17 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Reseed authentic FHIR clinical records across forks
+app.post('/api/reseed-fhir', async (req, res) => {
+  try {
+    const { seedFhirForkData } = require('./scripts/seedFhirForkData');
+    await seedFhirForkData();
+    res.json({ success: true, message: 'Successfully seeded authentic HL7 FHIR records across all forks.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Initialize & Boot Platform
 async function startPlatform() {
   console.log('===========================================================');
@@ -449,6 +699,18 @@ async function startPlatform() {
         console.log('Registering clean fork tree topology (0 mock records)...');
         await seedForkTree();
       }
+    }
+
+    // Auto-seed authentic HL7 FHIR records across network entities if empty
+    try {
+      const rootRecords = await forkTreeService.getChainPatientRecords(8546);
+      if (!rootRecords || rootRecords.length === 0) {
+        console.log('Seeding authentic HL7 FHIR records across forks for P-101, P-102, P-103...');
+        const { seedFhirForkData } = require('./scripts/seedFhirForkData');
+        await seedFhirForkData();
+      }
+    } catch (e) {
+      console.warn('Auto-seed check notice:', e.message);
     }
 
     app.listen(PORT, () => {

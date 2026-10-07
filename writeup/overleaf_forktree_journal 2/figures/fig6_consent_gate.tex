@@ -1,0 +1,74 @@
+\begin{tikzpicture}[
+    scale=0.85, transform shape,
+    font=\sffamily\footnotesize,
+    node distance=0.7cm and 0.4cm,
+    stepBox/.style={
+        rectangle, rounded corners=3pt, draw=black, line width=1pt,
+        fill=white, text width=7.4cm, align=center, inner sep=4pt
+    },
+    decisionBox/.style={
+        diamond, draw=black, line width=1.1pt, fill=gray!15,
+        text width=2.6cm, align=center, inner sep=2pt, aspect=1.8
+    },
+    allowBox/.style={
+        rectangle, rounded corners=3pt, draw=black, line width=1.2pt,
+        fill=white, text width=3.4cm, align=center, inner sep=3.5pt, font=\sffamily\scriptsize
+    },
+    denyBox/.style={
+        rectangle, rounded corners=3pt, draw=black, line width=1.2pt, dashed,
+        fill=gray!12, text width=3.4cm, align=center, inner sep=3.5pt, font=\sffamily\scriptsize
+    },
+    patientBox/.style={
+        rectangle, rounded corners=4pt, draw=black, line width=1.3pt,
+        fill=gray!25, text width=7.4cm, align=center, inner sep=4pt
+    },
+    flow/.style={
+        -{Stealth[length=5pt, width=3.5pt]}, line width=1pt, draw=black
+    },
+    labelTxt/.style={
+        font=\sffamily\scriptsize\bfseries, fill=white, draw=black, inner sep=1.5pt, rounded corners=1pt
+    }
+]
+
+% Top: Patient Sovereign Policy
+\node[patientBox] (patient) {
+    \textbf{Patient Sovereign Portal (Asynchronous On-Chain Policy)}\\
+    \textit{Interactive Consent Toggles: } $\mathcal{C}(P_k, C_i) \leftarrow \{\text{Granted}, \text{Revoked}\}$\\
+    Signed via Patient Private Key $\sigma_{\text{patient}}$ $\bullet$ Committed to $C_{\text{repo}}$
+};
+
+% Middle 1: Query Initiated
+\node[stepBox, below=0.6cm of patient] (req) {
+    \textbf{1. Clinical Traversal Query Initiated}\\
+    $\text{BFS-EHR} / \text{DFS-EHR}(P_k, C_i)$ $\bullet$ \textit{Clinician / Specialist Request}
+};
+
+% Middle 2: Decision
+\node[decisionBox, below=0.7cm of req] (check) {
+    \textbf{Consent State?}\\
+    $\mathcal{C}(P_k, C_i) \stackrel{?}{=} \text{Granted}$
+};
+
+% Bottom: Outcomes side-by-side
+\node[allowBox, below left=0.8cm and -0.2cm of check] (grant) {
+    \textbf{[+] Access Granted}\\
+    1. Retrieve Ciphertext $c$\\
+    2. Decrypt with Key $\mathcal{K}$\\
+    3. Assert $\mathcal{H}(m) \equiv h$\\
+    4. Append to EHR $\mathcal{L}$
+};
+
+\node[denyBox, below right=0.8cm and -0.2cm of check] (deny) {
+    \textbf{[-] Access Gated / Denied}\\
+    $\text{VisibleRecords}(P_k, C_i) \leftarrow \emptyset$\\
+    Log Consent Denial on $C_{\text{repo}}$\\
+    \textit{Zero PHI Exposure}
+};
+
+% Flows
+\draw[flow, dashed] (patient) -- node[labelTxt] {Updates Gatekeeper State} (req);
+\draw[flow] (req) -- (check);
+\draw[flow] (check) -| node[labelTxt, above] {Granted} (grant);
+\draw[flow] (check) -| node[labelTxt, above] {Revoked} (deny);
+
+\end{tikzpicture}

@@ -1,0 +1,99 @@
+\begin{tikzpicture}[
+    scale=0.86, transform shape,
+    node distance=0.9cm and 1.2cm,
+    font=\sffamily\footnotesize,
+    layerBox/.style={
+        rectangle, rounded corners=6pt, draw=gray!60, line width=1pt,
+        inner sep=10pt, fill=gray!3
+    },
+    docNode/.style={
+        rectangle, rounded corners=4pt, draw=blue!80!black, line width=1.1pt,
+        fill=blue!10, text width=4.0cm, align=center, inner sep=6pt,
+        drop shadow={opacity=0.1, shadow xshift=1.5pt, shadow yshift=-1.5pt}
+    },
+    vaultNode/.style={
+        rectangle, rounded corners=4pt, draw=teal!80!black, line width=1.1pt,
+        fill=teal!10, text width=4.4cm, align=center, inner sep=5pt,
+        drop shadow={opacity=0.1, shadow xshift=1.5pt, shadow yshift=-1.5pt}
+    },
+    chainNode/.style={
+        rectangle, rounded corners=4pt, draw=purple!80!black, line width=1.1pt,
+        fill=purple!10, text width=4.6cm, align=center, inner sep=5pt,
+        drop shadow={opacity=0.1, shadow xshift=1.5pt, shadow yshift=-1.5pt}
+    },
+    opNode/.style={
+        rectangle, rounded corners=3pt, draw=orange!90!black, line width=1pt,
+        fill=orange!15, text width=3.2cm, align=center, inner sep=4pt
+    },
+    flowArrow/.style={
+        -{Stealth[length=6pt, width=4pt]}, line width=1.1pt, draw=gray!80!black
+    },
+    hashArrow/.style={
+        -{Stealth[length=6pt, width=4pt]}, line width=1.2pt, draw=purple!80!black
+    },
+    encArrow/.style={
+        -{Stealth[length=6pt, width=4pt]}, line width=1.2pt, draw=teal!80!black
+    }
+]
+
+% Left: Input Document
+\node[docNode] (fhir) {
+    \textbf{HL7 FHIR R4 Document}\\
+    Canonical JSON Payload $m$\\
+    \vspace{2pt}
+    \texttt{\scriptsize \{"resourceType": "Observation",}\\
+    \texttt{\scriptsize "code": "LOINC:24323-8",}\\
+    \texttt{\scriptsize "subject": "Patient/P101", ...\}}
+};
+
+% Off-Chain Branch (Top)
+\node[opNode, above right=0.6cm and 1.2cm of fhir] (aes) {
+    \textbf{AES-256-GCM Engine}\\
+    $\text{IV} \leftarrow_R \{0,1\}^{128}$\\
+    $\mathcal{K} \in \{0,1\}^{256}$ (HSM/KMS)\\
+    $\text{AAD} = (\text{pid} \parallel \text{type})$
+};
+
+\node[vaultNode, right=1.0cm of aes] (vault) {
+    \textbf{Encrypted Off-Chain Vault}\\
+    \textbf{Ciphertext:} $c \in \{0,1\}^*$\\
+    \textbf{Auth Tag:} $\tau \in \{0,1\}^{128}$\\
+    \vspace{2pt}
+    \textbf{IPFS Multihash CID:} \texttt{ipfs://bafk...}
+};
+
+% On-Chain Branch (Bottom)
+\node[opNode, below right=0.6cm and 1.2cm of fhir] (hash) {
+    \textbf{SHA-256 Digest Engine}\\
+    $h = \mathcal{H}(\text{JCS}(m))$\\
+    $\in \{0, 1\}^{256}$ (Deterministic)
+};
+
+\node[chainNode, right=1.0cm of hash] (ledger) {
+    \textbf{On-Chain Smart Contract}\\
+    \texttt{BlockData.sol} ($C_i$)\\
+    \vspace{2pt}
+    \textbf{Anchor Tuple:} $\Gamma = (B, N, P, \text{pid}, \text{type}, h, \sigma_{\text{doc}})$\\
+    \textit{Zero Plaintext PHI Committed}
+};
+
+% Flows
+\draw[encArrow] (fhir.north) |- node[above, font=\sffamily\scriptsize\bfseries, text=teal!90!black] {Confidential PHI} (aes.west);
+\draw[encArrow] (aes.east) -- node[above, font=\sffamily\scriptsize] {$(c, \tau)$} (vault.west);
+
+\draw[hashArrow] (fhir.south) |- node[below, font=\sffamily\scriptsize\bfseries, text=purple!90!black] {Canonical RFC 8785} (hash.west);
+\draw[hashArrow] (hash.east) -- node[above, font=\sffamily\scriptsize] {Hash $h$} (ledger.west);
+
+% Cross Verification Anchor
+\draw[<->, dashed, line width=1.2pt, draw=red!70!black] (vault.south) -- node[right, font=\sffamily\scriptsize\bfseries, text=red!80!black, align=left] {Integrity Proof:\\$\mathcal{H}(\text{Decrypt}_{\mathcal{K}}(c)) \equiv h$} (ledger.north);
+
+% Background annotation boxes
+\begin{scope}[on background layer]
+    \node[layerBox, fit=(aes)(vault), fill=teal!4, draw=teal!40] (boxVault) {};
+    \node[anchor=north east, font=\sffamily\scriptsize\bfseries, text=teal!80!black] at (boxVault.north east) {OFF-CHAIN VAULT: Data Confidentiality \& Erasability (GDPR Art. 17 / HIPAA \S 164.312)};
+
+    \node[layerBox, fit=(hash)(ledger), fill=purple!4, draw=purple!40] (boxLedger) {};
+    \node[anchor=south east, font=\sffamily\scriptsize\bfseries, text=purple!80!black] at (boxLedger.south east) {ON-CHAIN LEDGER: Immutable Integrity Anchor (Zero PHI Exposure)};
+\end{scope}
+
+\end{tikzpicture}

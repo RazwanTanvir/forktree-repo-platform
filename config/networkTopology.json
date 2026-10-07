@@ -2,7 +2,7 @@
   "repositoryChain": {
     "networkId": 11101,
     "port": 8545,
-    "name": "Metadata Blockchain (Repository)",
+    "name": "Consortium Governance Repository",
     "contractType": "StoreForkEvent",
     "rpcUrl": "http://localhost:8545"
   },
@@ -10,7 +10,7 @@
     {
       "networkId": 11102,
       "port": 8546,
-      "name": "Root Blockchain",
+      "name": "Master Patient Index (MPI Root)",
       "parentNetworkId": 11101,
       "forkBlockNumber": 0,
       "isRoot": true,
@@ -19,7 +19,7 @@
     {
       "networkId": 11103,
       "port": 8547,
-      "name": "Fork Alpha (from 11102)",
+      "name": "Metro General Hospital",
       "parentNetworkId": 11102,
       "forkBlockNumber": 1,
       "isRoot": false,
@@ -28,7 +28,7 @@
     {
       "networkId": 11104,
       "port": 8548,
-      "name": "Fork Beta (from 11102)",
+      "name": "BioLabs Diagnostic Center",
       "parentNetworkId": 11102,
       "forkBlockNumber": 3,
       "isRoot": false,
@@ -37,7 +37,7 @@
     {
       "networkId": 11105,
       "port": 8549,
-      "name": "Fork Gamma (from 11103)",
+      "name": "Cardio Specialty Clinic",
       "parentNetworkId": 11103,
       "forkBlockNumber": 2,
       "isRoot": false,
@@ -46,7 +46,7 @@
     {
       "networkId": 11106,
       "port": 8550,
-      "name": "Fork Delta (from 11103)",
+      "name": "Emergency Care Center",
       "parentNetworkId": 11103,
       "forkBlockNumber": 1,
       "isRoot": false,
@@ -55,7 +55,7 @@
     {
       "networkId": 11107,
       "port": 8551,
-      "name": "Fork Epsilon (from 11104)",
+      "name": "Consortium Pharmacy Network",
       "parentNetworkId": 11104,
       "forkBlockNumber": 3,
       "isRoot": false,

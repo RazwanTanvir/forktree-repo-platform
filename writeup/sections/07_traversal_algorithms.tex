@@ -1,0 +1,119 @@
+\section{Multi-Chain Graph Traversal \& Longitudinal EHR Reconstruction}
+\label{sec:traversal_algorithms}
+
+A central challenge in partitioned, multi-chain healthcare architectures is reconstructing a coherent, unified longitudinal electronic health record (EHR) distributed across disparate, autonomous blockchain forks~\cite{cormen2022introduction}. This section specifies two deterministic graph traversal strategies over the fork-tree arborescence $T = (V,E)$, analyzes their asymptotic computational complexities, and proves formal theorems guaranteeing reconstruction completeness and cryptographic tamper evidence.
+
+\subsection{The Distributed Reconstruction Challenge}
+In conventional centralized databases, aggregating a patient's historical records across multiple departments is accomplished via standard relational SQL joins. However, in our decentralized multi-chain architecture, clinical observations are partitioned across physically isolated blockchain nodes: demographic genesis profiles reside on Root $C_0$, acute inpatient encounters reside on Hospital $C_1$, diagnostic laboratory panels reside on Lab $C_2$, ambulatory cardiac vitals reside on Clinic $C_3$, and medication dispensations reside on Pharmacy $C_5$. To establish clinical context during emergency triage or comprehensive oncology reviews, the querying provider must execute a distributed traversal across the directed graph $T$. This traversal must systematically query each participating node's JSON-RPC endpoint, retrieve patient-specific clinical tuples, cryptographically verify their SHA-256 digests against on-chain anchors, evaluate patient consent states, and order the aggregated results chronologically.
+
+[Note / Expansion Opportunity: Future optimizations could implement client-side edge caching with Merkle bloom filters to prune entire blockchain sub-trees where a patient has never received clinical services.]
+
+\subsection{Level-Order Breadth-First Traversal ($\text{BFS-EHR}$)}
+Algorithm~\ref{alg:bfs} formalizes our Level-Order Breadth-First Search traversal strategy ($\text{BFS-EHR}$). $\text{BFS-EHR}$ prioritizes shallow sibling healthcare institutions, exploring the Master Patient Index at Level 0, expanding to regional general hospitals and primary diagnostic centers at Level 1, and subsequently descending into highly specialized clinics and local pharmacies at Level 2.
+
+\begin{algorithm}[t]
+\caption{Level-Order Breadth-First Search ($\text{BFS-EHR}$)}
+\label{alg:bfs}
+\begin{algorithmic}[1]
+\REQUIRE Root network ID $N_{\text{root}}$, Target $V_{\text{target}}$, Repository $\mathcal{S}_{\text{repo}}$
+\ENSURE Chronological longitudinal record list $\mathcal{L}$
+\STATE Initialize queue $\mathcal{Q} \leftarrow [N_{\text{root}}]$, visited set $\mathcal{V} \leftarrow \emptyset$, record set $\mathcal{L} \leftarrow []$
+\WHILE{$\mathcal{Q} \neq \emptyset$}
+    \STATE $u \leftarrow \mathcal{Q}.\text{pop}()$
+    \IF{$u \notin \mathcal{V}$}
+        \STATE $\mathcal{V} \leftarrow \mathcal{V} \cup \{u\}$
+        \STATE $C_u \leftarrow \text{ConnectToChain}(u)$
+        \STATE $R_u \leftarrow C_u.\text{getAllRecords}()$
+        \STATE $\mathcal{M}_u \leftarrow \{r \in R_u \mid r.\text{patientId} = V_{\text{target}} \lor r.\text{code} = V_{\text{target}}\}$
+        \FOR{\textbf{each } $r \in \mathcal{M}_u$}
+            \STATE $\text{Assert}(\text{SHA-256}(r.\text{resourceData}) \equiv r.\text{dataHash})$
+            \STATE $\mathcal{L}.\text{append}(r)$
+        \ENDFOR
+        \STATE $\mathcal{N}_u \leftarrow \mathcal{S}_{\text{repo}}.\text{getAdjacencyList}(u)$
+        \FOR{\textbf{each } $v \in \mathcal{N}_u$}
+            \STATE $\mathcal{Q}.\text{push}(v)$
+        \ENDFOR
+    \ENDIF
+\ENDWHILE
+\STATE Sort $\mathcal{L}$ by block timestamp $t_{\text{block}}$
+\RETURN $\mathcal{L}$
+\end{algorithmic}
+\end{algorithm}
+
+As demonstrated in Algorithm~\ref{alg:bfs}, $\text{BFS-EHR}$ maintains a First-In-First-Out (FIFO) queue $\mathcal{Q}$ and an explicit visited set $\mathcal{V}$ to prevent redundant queries. At each visited node $u$, the client queries the local \texttt{BlockData.sol} contract via JSON-RPC, filters records matching target $V_{\text{target}}$, verifies that the SHA-256 digest of the off-chain JSON matches the immutable on-chain hash, and enqueues all registered child forks from the repository adjacency list. Finally, all verified records are sorted by block timestamp $t_{\text{block}}$ to produce a chronological longitudinal trajectory.
+
+[Note / Expansion Opportunity: The FIFO queue expansion can be parallelized using asynchronous JavaScript Promise.all constructs to query all sibling nodes at level $k$ concurrently.]
+
+\subsection{Depth-First Longitudinal Traversal ($\text{DFS-EHR}$)}
+Algorithm~\ref{alg:dfs} specifies our Depth-First Longitudinal Search traversal strategy ($\text{DFS-EHR}$). Unlike $\text{BFS-EHR}$, $\text{DFS-EHR}$ penetrates deep into specific clinical specializations (e.g., following an acute hospital fork down into cardiology and emergency sub-forks) before backtracking to sibling branches.
+
+\begin{algorithm}[t]
+\caption{Depth-First Longitudinal Search ($\text{DFS-EHR}$)}
+\label{alg:dfs}
+\begin{algorithmic}[1]
+\REQUIRE Network ID $u$, Target $V_{\text{target}}$, Visited set $\mathcal{V}$, Repository $\mathcal{S}_{\text{repo}}$, Record list $\mathcal{L}$
+\ENSURE Updated longitudinal clinical record list $\mathcal{L}$
+\STATE $\mathcal{V} \leftarrow \mathcal{V} \cup \{u\}$
+\STATE $C_u \leftarrow \text{ConnectToChain}(u)$
+\STATE $R_u \leftarrow C_u.\text{getAllRecords}()$
+\STATE $\mathcal{M}_u \leftarrow \{r \in R_u \mid r.\text{patientId} = V_{\text{target}} \lor r.\text{code} = V_{\text{target}}\}$
+\FOR{\textbf{each } $r \in \mathcal{M}_u$}
+    \STATE $\text{Assert}(\text{SHA-256}(r.\text{resourceData}) \equiv r.\text{dataHash})$
+    \STATE $\mathcal{L}.\text{append}(r)$
+\ENDFOR
+\STATE $\mathcal{N}_u \leftarrow \mathcal{S}_{\text{repo}}.\text{getAdjacencyList}(u)$
+\FOR{\textbf{each } $v \in \mathcal{N}_u$}
+    \IF{$v \notin \mathcal{V}$}
+        \STATE $\text{DFS-EHR}(v, V_{\text{target}}, \mathcal{V}, \mathcal{S}_{\text{repo}}, \mathcal{L})$
+    \ENDIF
+\ENDFOR
+\RETURN $\mathcal{L}$
+\end{algorithmic}
+\end{algorithm}
+
+$\text{DFS-EHR}$ is structurally advantageous when an investigator seeks to trace an acute patient's localized progression through an intensive care unit and affiliated specialty clinics before examining unrelated community pharmacy records. By traversing lineage edges recursively, $\text{DFS-EHR}$ discovers records along a specific institutional lineage branch with minimal initial breadth overhead.
+
+[Note / Expansion Opportunity: Recursion depth limits can be enforced to prevent call-stack exhaustion in deeply nested consortium trees with over 50 hierarchical fork levels.]
+
+\subsection{Complexity Analysis}
+We analyze the computational and network overhead associated with multi-chain longitudinal reconstruction across both algorithms.
+
+\begin{theorem}[Computational \& Network Complexity]
+\label{thm:complexity_traversal}
+Let $|V|$ denote the total number of active blockchain forks, $|E| = |V| - 1$ the lineage edges in arborescence $T$, $\tau_{\text{RPC}}$ the average JSON-RPC network latency, and $\overline{|R|}$ the mean number of records stored per blockchain. The worst-case time complexity $T_{\text{recon}}$ and space complexity $S_{\text{recon}}$ for both $\text{BFS-EHR}$ and $\text{DFS-EHR}$ satisfy:
+\begin{equation}
+T_{\text{recon}} = \mathcal{O}\left(|V| \cdot (\tau_{\text{RPC}} + \overline{|R|})\right), \quad S_{\text{recon}} = \mathcal{O}\left(|V| + |\mathcal{L}|\right)
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+Because $T$ is an acyclic tree rooted at $C_0$, the number of directed edges satisfies $|E| = |V| - 1$. The outer exploration loop visits each vertex $u \in V$ exactly once due to the presence of the visited set $\mathcal{V}$. At each vertex $u$, the algorithm initiates one JSON-RPC network request incurring latency $\tau_{\text{RPC}}$, retrieves $R_u$ records, and iterates over each record to perform string matching and a SHA-256 digest validation taking time $\mathcal{O}(|m|)$. The edge inspection step evaluates the adjacency list $\mathcal{N}_u$, summing to $\sum_{u \in V} |\mathcal{N}_u| = |E| = |V| - 1$ operations across the entire traversal. Summing these costs yields the total time complexity:
+\begin{equation}
+T_{\text{recon}} = \sum_{u \in V} \left( \tau_{\text{RPC}} + |R_u| \cdot \mathcal{O}(|m|) \right) + |E| = \mathcal{O}\left(|V| \cdot \tau_{\text{RPC}} + \sum_{u \in V} |R_u|\right)
+\end{equation}
+which simplifies to $\mathcal{O}(|V| \cdot (\tau_{\text{RPC}} + \overline{|R|}))$. The auxiliary memory space is dominated by the FIFO queue $\mathcal{Q}$ (or call stack) bounded by $|V|$, the visited set $\mathcal{V}$ bounded by $|V|$, and the accumulated output record set $|\mathcal{L}|$, establishing $S_{\text{recon}} = \mathcal{O}(|V| + |\mathcal{L}|)$.
+\end{proof}
+
+[Note / Expansion Opportunity: In federations with tens of thousands of records per node, on-chain indexing mappings mapping patient ID hashes to record arrays can reduce the per-node search from $\mathcal{O}(|R_u|)$ to $\mathcal{O}(1)$.]
+
+\subsection{Formal Theorems on Completeness & Integrity}
+
+\begin{theorem}[Longitudinal Reconstruction Completeness]
+\label{thm:reconstruction_completeness}
+Let $T = (V, E)$ be a connected directed tree rooted at $C_0$. For any clinical record $\rho$ associated with patient $P_k$ committed to any blockchain $C_i \in V$, both $\text{BFS-EHR}$ and $\text{DFS-EHR}$ are mathematically guaranteed to discover $\rho$ in finite execution time.
+\end{theorem}
+
+\begin{proof}
+By construction of the consortium governance protocol in \texttt{ConsortiumGovernance.sol}, an autonomous blockchain $C_v$ can only be instantiated through the execution of an approved proposal $\Pi$. The atomic execution routine updates the repository state by recording the directed edge $\text{adj}[N_{\text{parent}}] \leftarrow \text{adj}[N_{\text{parent}}] \cup \{N_{\text{new}}\}$, where $N_{\text{parent}}$ is an existing active node in $T$. By induction on tree depth, every node in $V$ is reachable from root $C_0$ through a finite sequence of directed lineage edges. Because both standard Breadth-First Search and Depth-First Search explore every reachable vertex in a connected finite graph~\cite{cormen2022introduction}, the set of visited nodes upon termination satisfies $\mathcal{V} = V$. Since every node $C_i \in V$ is visited, its full record set $R_i$ is retrieved via \texttt{getAllRecords()}. If $\rho \in R_i$ matches $P_k$, it is verified and appended to $\mathcal{L}$. Therefore, $\rho \in \mathcal{L}$, guaranteeing complete longitudinal reconstruction.
+\end{proof}
+
+\begin{theorem}[Tamper-Evident Integrity Invariant]
+\label{thm:tamper_invariant}
+Let $\rho = (m, h)$ denote a clinical record consisting of off-chain payload $m$ and on-chain digest $h$. Any unauthorized modification $m \to m'$ ($m' \neq m$) executed in the off-chain vault is detected with probability $1 - 2^{-256}$ upon traversal evaluation.
+\end{theorem}
+
+\begin{proof}
+The traversal algorithms evaluate the assertion $\text{Assert}(\text{SHA-256}(r.\text{resourceData}) \equiv r.\text{dataHash})$ on line 12 of $\text{BFS-EHR}$ and line 6 of $\text{DFS-EHR}$. For an adversary to modify $m \to m'$ without triggering an assertion failure, they must find a collision $m' \neq m$ such that $\text{SHA-256}(m') = \text{SHA-256}(m) = h$. Under the standard cryptographic security definitions of SHA-256, finding a second pre-image requires $\mathcal{O}(2^{256})$ work, which is computationally infeasible for any polynomial-time adversary. Thus, any unauthorized alteration causes an instant assertion failure, proving tamper evidence.
+\end{proof}
+
+[Note / Expansion Opportunity: Future work can implement automated Byzantine alerting smart contracts on $C_{\text{repo}}$ that penalize or slash the staking deposits of institutions detected serving corrupted off-chain records.]

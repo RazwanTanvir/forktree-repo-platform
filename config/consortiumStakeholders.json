@@ -64,7 +64,7 @@
       "title": "Diagnostic Pathologist / Lab Tech",
       "address": "0x4444444444444444444444444444444444444444",
       "organizationId": 11104,
-      "organizationName": "BioLabs Pathology & Diagnostics",
+      "organizationName": "BioLabs Diagnostic Center",
       "role": "SPECIALIST",
       "port": 8548,
       "permissions": [
@@ -76,22 +76,40 @@
       "avatar": "🔬"
     },
     {
-      "id": "horizon-payor-admin",
-      "name": "Sarah Jenkins",
-      "title": "VP Health Insurance & Claims",
+      "id": "cardio-admin",
+      "name": "Dr. Sarah Jenkins",
+      "title": "Chief of Cardiology / Clinic Admin",
       "address": "0x5555555555555555555555555555555555555555",
       "organizationId": 11105,
-      "organizationName": "Horizon Health Payor",
+      "organizationName": "Cardio Specialty Clinic",
       "role": "ORG_ADMIN",
       "port": 8549,
       "permissions": [
         "REQUEST_FORK",
-        "PROCESS_CLAIMS",
         "VOTE_PROPOSALS",
         "SEND_INTER_ORG_MSG",
-        "READ_RECORDS"
+        "READ_RECORDS",
+        "WRITE_RECORDS"
       ],
-      "avatar": "🛡️"
+      "avatar": "🫀"
+    },
+    {
+      "id": "emergency-admin",
+      "name": "Dr. Dave Ross",
+      "title": "Chief of Emergency Medicine",
+      "address": "0x8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a",
+      "organizationId": 11106,
+      "organizationName": "Emergency Care Center",
+      "role": "ORG_ADMIN",
+      "port": 8550,
+      "permissions": [
+        "REQUEST_FORK",
+        "VOTE_PROPOSALS",
+        "SEND_INTER_ORG_MSG",
+        "READ_RECORDS",
+        "WRITE_RECORDS"
+      ],
+      "avatar": "🚑"
     },
     {
       "id": "apex-pharmacy-specialist",
@@ -99,7 +117,7 @@
       "title": "Lead Clinical Pharmacist",
       "address": "0x7777777777777777777777777777777777777777",
       "organizationId": 11107,
-      "organizationName": "Outpatient Pharmacy Network",
+      "organizationName": "Consortium Pharmacy Network",
       "role": "SPECIALIST",
       "port": 8551,
       "permissions": [
@@ -116,7 +134,7 @@
       "title": "Consortium Regulatory Auditor",
       "address": "0x6666666666666666666666666666666666666666",
       "organizationId": 11101,
-      "organizationName": "Consortium Governance Board",
+      "organizationName": "Consortium Governance Repository",
       "role": "AUDITOR",
       "port": 8545,
       "permissions": [
@@ -133,9 +151,10 @@
       "title": "Healthcare Consumer / Patient",
       "address": "0x9999999999999999999999999999999999999999",
       "organizationId": 11102,
-      "organizationName": "Master Patient Index (MPI)",
+      "organizationName": "Master Patient Index (MPI Root)",
       "role": "PATIENT",
       "port": 8546,
+      "patientId": "P-101",
       "permissions": [
         "VIEW_OWN_EHR",
         "MANAGE_CONSENT",
@@ -149,7 +168,7 @@
       "title": "Lab Owner",
       "address": "0x8ca42809f1294f43ff318bdcb75886351dc25462",
       "organizationId": 11103,
-      "organizationName": "Fork Alpha",
+      "organizationName": "Metro General Hospital",
       "role": "ORG_ADMIN",
       "port": 8547,
       "permissions": [
@@ -164,7 +183,7 @@
       "title": "Lab Owner",
       "address": "0x941708225ee56d52766f34ef5543a93ee396ea8e",
       "organizationId": 11103,
-      "organizationName": "Fork Alpha",
+      "organizationName": "Metro General Hospital",
       "role": "CLINICIAN",
       "port": 8547,
       "permissions": [
@@ -215,7 +234,7 @@
     ],
     "8550": [
       {
-        "address": "0x5555555555555555555555555555555555555555",
+        "address": "0x8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a",
         "role": "ADMIN",
         "name": "Dr. Dave Ross"
       }

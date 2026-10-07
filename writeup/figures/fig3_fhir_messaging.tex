@@ -1,0 +1,99 @@
+\begin{tikzpicture}[
+    scale=0.88, transform shape,
+    font=\sffamily\footnotesize,
+    lifeline/.style={draw=gray!50, line width=1pt, dashed},
+    actor/.style={
+        rectangle, rounded corners=4pt, draw=blue!80!black, line width=1.1pt,
+        fill=blue!10, text width=4.2cm, align=center, inner sep=6pt,
+        drop shadow={opacity=0.1, shadow xshift=1.5pt, shadow yshift=-1.5pt}
+    },
+    repoActor/.style={
+        rectangle, rounded corners=4pt, draw=purple!80!black, line width=1.1pt,
+        fill=purple!10, text width=4.4cm, align=center, inner sep=6pt,
+        drop shadow={opacity=0.1, shadow xshift=1.5pt, shadow yshift=-1.5pt}
+    },
+    labActor/.style={
+        rectangle, rounded corners=4pt, draw=teal!80!black, line width=1.1pt,
+        fill=teal!10, text width=4.2cm, align=center, inner sep=6pt,
+        drop shadow={opacity=0.1, shadow xshift=1.5pt, shadow yshift=-1.5pt}
+    },
+    msg/.style={
+        -{Stealth[length=5pt, width=3.5pt]}, line width=1.1pt, draw=gray!80!black
+    },
+    internalStep/.style={
+        rectangle, rounded corners=3pt, draw=orange!80!black, line width=0.8pt,
+        fill=orange!12, text width=3.6cm, align=center, inner sep=3pt, font=\sffamily\scriptsize
+    },
+    stateBox/.style={
+        rectangle, rounded corners=3pt, draw=purple!80!black, line width=0.8pt,
+        fill=purple!15, text width=3.8cm, align=center, inner sep=3pt, font=\sffamily\scriptsize\bfseries
+    },
+    msgLabel/.style={
+        font=\sffamily\scriptsize, fill=white, inner sep=1.5pt, rounded corners=1.5pt
+    }
+]
+
+% Actors
+\node[actor] (hosp) at (0, 0) {
+    \textbf{Metro General Hospital}\\
+    \textit{Originator Chain $C_1$ (Net 11103)}
+};
+
+\node[repoActor] (repo) at (5.6, 0) {
+    \textbf{Consortium Governance}\\
+    \textit{Repository Chain $C_{\text{repo}}$ (Net 11101)}
+};
+
+\node[labActor] (lab) at (11.2, 0) {
+    \textbf{BioLabs Diagnostics}\\
+    \textit{Specialist Chain $C_2$ (Net 11104)}
+};
+
+% Bottom anchors
+\coordinate (hospB) at (0, -7.8);
+\coordinate (repoB) at (5.6, -7.8);
+\coordinate (labB) at (11.2, -7.8);
+
+% Lifelines
+\draw[lifeline] (hosp.south) -- (hospB);
+\draw[lifeline] (repo.south) -- (repoB);
+\draw[lifeline] (lab.south) -- (labB);
+
+% Step 1: Order Dispatch
+\coordinate (t1) at (0, -1.0);
+\coordinate (t1R) at (5.6, -1.0);
+\draw[msg] (t1) -- node[msgLabel, above] {1. \texttt{sendMessage(11103, 11104, ServiceRequest, $h_{\text{req}}$)}} (t1R);
+
+% Step 2: Repo state transition
+\node[stateBox] at (5.6, -1.7) {State: \texttt{PENDING} (0)\\Msg ID: 1 $\bullet$ Hash: $h_{\text{req}}$};
+
+% Step 3: Event broadcast / Scoped query
+\coordinate (t3L) at (11.2, -2.5);
+\coordinate (t3R) at (5.6, -2.5);
+\draw[msg] (t3L) -- node[msgLabel, above] {2. \texttt{getMessagesForOrganization(11104)}} (t3R);
+
+\coordinate (t3bL) at (11.2, -3.2);
+\coordinate (t3bR) at (5.6, -3.2);
+\draw[msg] (t3bR) -- node[msgLabel, above] {3. Returns Scoped Order Mailbox (Target $C_2$)} (t3bL);
+
+% Step 4: Lab processing
+\node[internalStep] at (11.2, -4.2) {
+    Specimen Analysis \& Synthesis:\\
+    Generate FHIR \texttt{DiagnosticReport}\\
+    Compute Digest $h_{\text{rep}} = \mathcal{H}(m_{\text{rep}})$
+};
+
+% Step 5: Fulfillment
+\coordinate (t5L) at (11.2, -5.3);
+\coordinate (t5R) at (5.6, -5.3);
+\draw[msg, draw=teal!80!black] (t5L) -- node[msgLabel, above, text=teal!90!black] {4. \texttt{fulfillFhirOrder(msgId=1, DiagnosticReport, $h_{\text{rep}}$)}} (t5R);
+
+% Step 6: State transition to FULFILLED
+\node[stateBox] at (5.6, -6.1) {State: \texttt{FULFILLED} (3)\\Immutable Link: $\text{Req}_1 \leftrightarrow \text{Rep}_1$};
+
+% Step 7: Hospital notification
+\coordinate (t7R) at (5.6, -7.0);
+\coordinate (t7H) at (0, -7.0);
+\draw[msg, draw=blue!80!black] (t7R) -- node[msgLabel, above, text=blue!90!black] {5. Retrieve Fulfillment \& Verify Digest: $\mathcal{H}(m_{\text{rep}}) \equiv h_{\text{rep}}$} (t7H);
+
+\end{tikzpicture}

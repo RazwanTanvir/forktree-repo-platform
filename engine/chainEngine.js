@@ -51,13 +51,17 @@ class BlockchainNode {
   }
 
   _initGenesis() {
-    this.blocks.push({
+    this.blocks = [{
       number: '0x0',
+      blockNumber: 0,
       hash: '0x' + (this.networkId.toString(16).padStart(64, '0')),
       parentHash: '0x' + '0'.repeat(64),
       timestamp: '0x' + Math.floor(Date.now() / 1000).toString(16),
+      timestampSec: Math.floor(Date.now() / 1000),
+      miner: this.accounts[0],
+      gasUsed: '0x0',
       transactions: []
-    });
+    }];
   }
 
   saveStateToFile() {
@@ -167,7 +171,8 @@ class BlockchainNode {
       allState[this.port] = {
         blockNumber: this.blockNumber,
         contracts: contractsObj,
-        receipts: Array.from(this.receipts.entries())
+        receipts: Array.from(this.receipts.entries()),
+        blocks: this.blocks
       };
 
       fs.writeFileSync(STATE_FILE, JSON.stringify(allState, null, 2), 'utf-8');
@@ -184,6 +189,9 @@ class BlockchainNode {
       if (!state) return;
 
       this.blockNumber = state.blockNumber || 0;
+      if (state.blocks && Array.isArray(state.blocks) && state.blocks.length > 0) {
+        this.blocks = state.blocks;
+      }
       if (state.receipts) {
         this.receipts = new Map(state.receipts);
       }
@@ -302,12 +310,12 @@ class BlockchainNode {
   _seedInitialOrganizations(contract) {
     if (contract.state.organizations.length > 0) return;
     const initialOrgs = [
-      { id: 1, name: 'Root Master Patient Index', admin: '0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02', net: 11102, port: 8546, type: 'Master Patient Index' },
+      { id: 1, name: 'Master Patient Index (MPI Root)', admin: '0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02', net: 11102, port: 8546, type: 'Master Patient Index' },
       { id: 2, name: 'Metro General Hospital', admin: '0x1111111111111111111111111111111111111111', net: 11103, port: 8547, type: 'Hospital Inpatient' },
-      { id: 3, name: 'BioLabs Pathology & Diagnostics', admin: '0x3333333333333333333333333333333333333333', net: 11104, port: 8548, type: 'Diagnostic Pathology' },
-      { id: 4, name: 'CardioSpecialty Center', admin: '0x4444444444444444444444444444444444444444', net: 11105, port: 8549, type: 'Specialty Clinic' },
-      { id: 5, name: 'Emergency & Urgent Care', admin: '0x5555555555555555555555555555555555555555', net: 11106, port: 8550, type: 'Emergency Care' },
-      { id: 6, name: 'Outpatient Pharmacy Network', admin: '0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02', net: 11107, port: 8551, type: 'Outpatient Pharmacy' }
+      { id: 3, name: 'BioLabs Diagnostic Center', admin: '0x3333333333333333333333333333333333333333', net: 11104, port: 8548, type: 'Diagnostic Pathology' },
+      { id: 4, name: 'Cardio Specialty Clinic', admin: '0x4444444444444444444444444444444444444444', net: 11105, port: 8549, type: 'Specialty Clinic' },
+      { id: 5, name: 'Emergency Care Center', admin: '0x5555555555555555555555555555555555555555', net: 11106, port: 8550, type: 'Emergency Care' },
+      { id: 6, name: 'Consortium Pharmacy Network', admin: '0x163f57598dE9Cc708E9497aA50b6D5e5eD368d02', net: 11107, port: 8551, type: 'Pharmacy Network' }
     ];
     for (const org of initialOrgs) {
       contract.state.organizations.push([
@@ -488,6 +496,23 @@ class BlockchainNode {
   _executeTransaction(tx) {
     this.blockNumber++;
     const txHash = ethers.keccak256(ethers.toUtf8Bytes(`tx-${this.port}-${this.blockNumber}-${Date.now()}-${Math.random()}`));
+    const blockHash = ethers.keccak256(ethers.toUtf8Bytes(`block-${this.port}-${this.blockNumber}-${Date.now()}`));
+    const prevBlock = this.blocks.length > 0 ? this.blocks[this.blocks.length - 1] : null;
+    const parentHash = prevBlock ? prevBlock.hash : ('0x' + '0'.repeat(64));
+    const nowSec = Math.floor(Date.now() / 1000);
+
+    const blockObj = {
+      number: '0x' + this.blockNumber.toString(16),
+      blockNumber: this.blockNumber,
+      hash: blockHash,
+      parentHash: parentHash,
+      timestamp: '0x' + nowSec.toString(16),
+      timestampSec: nowSec,
+      miner: this.accounts[0],
+      gasUsed: '0x5208',
+      transactions: [txHash]
+    };
+    this.blocks.push(blockObj);
 
     let contractAddress = null;
 
@@ -805,7 +830,7 @@ class BlockchainNode {
       transactionHash: txHash,
       transactionIndex: '0x0',
       blockNumber: '0x' + this.blockNumber.toString(16),
-      blockHash: ethers.keccak256(ethers.toUtf8Bytes(`block-${this.blockNumber}`)),
+      blockHash: blockHash,
       cumulativeGasUsed: '0x5208',
       gasUsed: '0x5208',
       contractAddress: contractAddress,
@@ -1016,13 +1041,15 @@ class BlockchainNode {
   }
 
   _getBlock(blockTag) {
-    return {
-      number: '0x' + this.blockNumber.toString(16),
-      hash: ethers.keccak256(ethers.toUtf8Bytes(`block-${this.blockNumber}`)),
-      parentHash: '0x' + '0'.repeat(64),
-      timestamp: '0x' + Math.floor(Date.now() / 1000).toString(16),
-      transactions: []
-    };
+    if (blockTag === 'latest' || blockTag === 'pending' || blockTag === undefined || blockTag === null) {
+      return this.blocks[this.blocks.length - 1] || this.blocks[0];
+    }
+    const num = typeof blockTag === 'string' && blockTag.startsWith('0x') ? parseInt(blockTag, 16) : Number(blockTag);
+    return this.blocks[num] || null;
+  }
+
+  getAllBlocks() {
+    return this.blocks;
   }
 }
 
